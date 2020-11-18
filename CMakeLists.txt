@@ -29,7 +29,11 @@ ENDIF(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -D_USE_MATH_DEFINES")
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-add_definitions(-std=c++11)
+# add_definitions(-std=c++11)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Enable the creation of folders for Visual Studio projects
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -70,11 +74,12 @@ set(GLM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/glm")
 include_directories(${GLM_INCLUDE_DIR})
 
 set(headers
-    src/main.h
+    src/vulkanrenderer.h
     )
 
 set(sources
     src/main.cpp
+    src/vulkanrenderer.cpp
     )
 
 list(SORT headers)
