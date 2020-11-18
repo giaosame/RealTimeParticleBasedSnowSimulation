@@ -1,6 +1,8 @@
 ﻿#include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 
+#include <glm/glm.hpp>
+
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
@@ -8,6 +10,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <array>
 #include <optional>
 #include <set>
 
@@ -62,6 +65,46 @@ struct SwapChainSupportDetails {
     std::vector<vk::PresentModeKHR> presentModes;
 };
 
+struct Vertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+
+    static vk::VertexInputBindingDescription getBindingDescription() {
+        vk::VertexInputBindingDescription bindingDescription = {};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.inputRate = vk::VertexInputRate::eVertex;
+
+        return bindingDescription;
+    }
+
+    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions() {
+        std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions = {};
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = vk::Format::eR32G32Sfloat;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+        return attributeDescriptions;
+    }
+};
+
+const std::vector<Vertex> vertices = {
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+    0, 1, 2, 2, 3, 0
+};
+
 class HelloTriangleApplication {
 public:
     void run() {
@@ -95,7 +138,13 @@ private:
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;
 
-    VkCommandPool commandPool;
+    vk::CommandPool commandPool;
+
+    vk::Buffer vertexBuffer;
+    vk::DeviceMemory vertexBufferMemory;
+    vk::Buffer indexBuffer;
+    vk::DeviceMemory indexBufferMemory;
+
     std::vector<vk::CommandBuffer, std::allocator<vk::CommandBuffer>> commandBuffers;
 
     std::vector<vk::Semaphore> imageAvailableSemaphores;
@@ -103,12 +152,21 @@ private:
     std::vector<vk::Fence> inFlightFences;
     size_t currentFrame = 0;
 
+    bool framebufferResized = false;
+
     void initWindow() {
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    }
+
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
     }
 
     void initVulkan() {
@@ -123,6 +181,8 @@ private:
         createGraphicsPipeline();
         createFramebuffers();
         createCommandPool();
+        createVertexBuffer();
+        createIndexBuffer();
         createCommandBuffers();
         createSyncObjects();
     }
@@ -136,20 +196,12 @@ private:
         device->waitIdle();
     }
 
-    void cleanup() {
-        // NOTE: instance destruction is handled by UniqueInstance, same for device
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            device->destroySemaphore(renderFinishedSemaphores[i]);
-            device->destroySemaphore(imageAvailableSemaphores[i]);
-            device->destroyFence(inFlightFences[i]);
-        }
-
-        device->destroyCommandPool(commandPool);
-
+    void cleanupSwapChain() {
         for (auto framebuffer : swapChainFramebuffers) {
             device->destroyFramebuffer(framebuffer);
         }
+
+        device->freeCommandBuffers(commandPool, commandBuffers);
 
         device->destroyPipeline(graphicsPipeline);
         device->destroyPipelineLayout(pipelineLayout);
@@ -159,8 +211,27 @@ private:
             device->destroyImageView(imageView);
         }
 
-        // not using UniqeSwapchain to destroy in correct order - before the surface
         device->destroySwapchainKHR(swapChain);
+    }
+
+    void cleanup() {
+        // NOTE: instance destruction is handled by UniqueInstance, same for device
+
+        cleanupSwapChain();
+
+        device->destroyBuffer(vertexBuffer);
+        device->freeMemory(vertexBufferMemory);
+
+        device->destroyBuffer(indexBuffer);
+        device->freeMemory(indexBufferMemory);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            device->destroySemaphore(renderFinishedSemaphores[i]);
+            device->destroySemaphore(imageAvailableSemaphores[i]);
+            device->destroyFence(inFlightFences[i]);
+        }
+
+        device->destroyCommandPool(commandPool);
 
         // surface is created by glfw, therefore not using a Unique handle
         instance->destroySurfaceKHR(surface);
@@ -172,6 +243,25 @@ private:
         glfwDestroyWindow(window);
 
         glfwTerminate();
+    }
+
+    void recreateSwapChain() {
+        int width = 0, height = 0;
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        device->waitIdle();
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createFramebuffers();
+        createCommandBuffers();
     }
 
     void createInstance() {
@@ -452,6 +542,14 @@ private:
         vertexInputInfo.vertexBindingDescriptionCount = 0;
         vertexInputInfo.vertexAttributeDescriptionCount = 0;
 
+        auto bindingDescription = Vertex::getBindingDescription();
+        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly = {};
         inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
@@ -465,8 +563,7 @@ private:
         viewport.maxDepth = 1.0f;
 
         vk::Rect2D scissor = {};
-        scissor.offset.x = 0;
-        scissor.offset.y = 0;
+        scissor.offset = VULKAN_HPP_NAMESPACE::Offset2D{ 0, 0 };
         scissor.extent = swapChainExtent;
 
         vk::PipelineViewportStateCreateInfo viewportState = {};
@@ -527,7 +624,6 @@ private:
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = nullptr;
 
-
         try {
             graphicsPipeline = (vk::Pipeline)device->createGraphicsPipeline(nullptr, pipelineInfo);
         }
@@ -574,6 +670,116 @@ private:
         }
     }
 
+    void createVertexBuffer() {
+        vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, vertices.data(), (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
+    void createIndexBuffer() {
+        vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, indices.data(), (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
+
+        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
+    void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory) {
+        vk::BufferCreateInfo bufferInfo = {};
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+
+        try {
+            buffer = device->createBuffer(bufferInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create buffer!");
+        }
+
+        vk::MemoryRequirements memRequirements = device->getBufferMemoryRequirements(buffer);
+
+        vk::MemoryAllocateInfo allocInfo = {};
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        try {
+            bufferMemory = device->allocateMemory(allocInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to allocate buffer memory!");
+        }
+
+        device->bindBufferMemory(buffer, bufferMemory, 0);
+    }
+
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        vk::CommandBufferAllocateInfo allocInfo = {};
+        allocInfo.level = vk::CommandBufferLevel::ePrimary;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        vk::CommandBuffer commandBuffer = device->allocateCommandBuffers(allocInfo)[0];
+
+        vk::CommandBufferBeginInfo beginInfo = {};
+        beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+        commandBuffer.begin(beginInfo);
+
+        vk::BufferCopy copyRegion = {};
+        copyRegion.srcOffset = 0; // Optional
+        copyRegion.dstOffset = 0; // Optional
+        copyRegion.size = size;
+        commandBuffer.copyBuffer(srcBuffer, dstBuffer, copyRegion);
+
+        commandBuffer.end();
+
+        vk::SubmitInfo submitInfo = {};
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        graphicsQueue.submit(submitInfo, nullptr);
+        graphicsQueue.waitIdle();
+
+        device->freeCommandBuffers(commandPool, commandBuffer);
+    }
+
+    uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+        vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+
+        throw std::runtime_error("failed to find suitable memory type!");
+    }
+
     void createCommandBuffers() {
         commandBuffers.resize(swapChainFramebuffers.size());
 
@@ -603,8 +809,7 @@ private:
             vk::RenderPassBeginInfo renderPassInfo = {};
             renderPassInfo.renderPass = renderPass;
             renderPassInfo.framebuffer = swapChainFramebuffers[i];
-            renderPassInfo.renderArea.offset.x = 0;
-            renderPassInfo.renderArea.offset.y = 0;
+            renderPassInfo.renderArea.offset = VULKAN_HPP_NAMESPACE::Offset2D{ 0, 0 };
             renderPassInfo.renderArea.extent = swapChainExtent;
 
             vk::ClearValue clearColor = { std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f } };
@@ -615,7 +820,12 @@ private:
 
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
-            commandBuffers[i].draw(3, 1, 0, 0);
+            vk::Buffer vertexBuffers[] = { vertexBuffer };
+            vk::DeviceSize offsets[] = { 0 };
+            commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
+            commandBuffers[i].bindIndexBuffer(indexBuffer, 0, VULKAN_HPP_NAMESPACE::IndexType::eUint16);
+
+            commandBuffers[i].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
             commandBuffers[i].endRenderPass();
 
@@ -647,10 +857,20 @@ private:
 
     void drawFrame() {
         device->waitForFences(1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-        device->resetFences(1, &inFlightFences[currentFrame]);
 
-        uint32_t imageIndex = device->acquireNextImageKHR(swapChain, std::numeric_limits<uint64_t>::max(),
-            imageAvailableSemaphores[currentFrame], nullptr).value;
+        uint32_t imageIndex;
+        try {
+            vk::ResultValue result = device->acquireNextImageKHR(swapChain, std::numeric_limits<uint64_t>::max(),
+                imageAvailableSemaphores[currentFrame], nullptr);
+            imageIndex = result.value;
+        }
+        catch (vk::OutOfDateKHRError err) {
+            recreateSwapChain();
+            return;
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
 
         vk::SubmitInfo submitInfo = {};
 
@@ -667,6 +887,8 @@ private:
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
+        device->resetFences(1, &inFlightFences[currentFrame]);
+
         try {
             graphicsQueue.submit(submitInfo, inFlightFences[currentFrame]);
         }
@@ -682,9 +904,23 @@ private:
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
         presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pResults = nullptr; // Optional
 
-        presentQueue.presentKHR(presentInfo);
+        vk::Result resultPresent;
+        try {
+            resultPresent = presentQueue.presentKHR(presentInfo);
+        }
+        catch (vk::OutOfDateKHRError err) {
+            resultPresent = vk::Result::eErrorOutOfDateKHR;
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to present swap chain image!");
+        }
+
+        if (resultPresent == vk::Result::eSuboptimalKHR || resultPresent == vk::Result::eSuboptimalKHR || framebufferResized) {
+            framebufferResized = false;
+            recreateSwapChain();
+            return;
+        }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
@@ -736,7 +972,10 @@ private:
             return capabilities.currentExtent;
         }
         else {
-            vk::Extent2D actualExtent = { static_cast<uint32_t>(WIDTH), static_cast<uint32_t>(HEIGHT) };
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+
+            vk::Extent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
             actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
             actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
@@ -841,8 +1080,7 @@ private:
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
         if (!file.is_open()) {
-            const std::string errorInfo = "failed to open file: " + filename + "!";
-            throw std::runtime_error(errorInfo);
+            throw std::runtime_error("failed to open file!");
         }
 
         size_t fileSize = (size_t)file.tellg();
@@ -864,7 +1102,6 @@ private:
 };
 
 int main() {
-
     HelloTriangleApplication app;
 
     try {
