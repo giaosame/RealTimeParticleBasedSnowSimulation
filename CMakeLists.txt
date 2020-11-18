@@ -75,6 +75,7 @@ include_directories(${GLM_INCLUDE_DIR})
 
 set(headers
     src/vulkanrenderer.h
+    external/tiny_obj_loader.h
     )
 
 set(sources
