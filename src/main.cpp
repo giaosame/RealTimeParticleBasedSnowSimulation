@@ -75,7 +75,7 @@ struct SwapChainSupportDetails {
 };
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
 
@@ -92,7 +92,7 @@ struct Vertex {
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = vk::Format::eR32G32Sfloat;
+        attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
         attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
         attributeDescriptions[1].binding = 0;
@@ -116,10 +116,15 @@ struct UniformBufferObject {
 };
 
 const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
 };
 
 const std::vector<uint16_t> indices = {
@@ -218,12 +223,12 @@ private:
         createRenderPass();
         createDescriptorSetLayout();
         createGraphicsPipeline();
-        createFramebuffers();
         createCommandPool();
+        createDepthResources();
+        createFramebuffers();
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        // createDepthResources();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -507,12 +512,13 @@ private:
         swapChainExtent = extent;
     }
 
-    vk::ImageView createImageView(vk::Image image, vk::Format format) {
+    vk::ImageView createImageView(vk::Image image, vk::Format format, 
+                                  vk::ImageAspectFlags aspectFlags = vk::ImageAspectFlags(vk::ImageAspectFlagBits::eColor)) {
         vk::ImageViewCreateInfo viewInfo{};
         viewInfo.image = image;
         viewInfo.viewType = vk::ImageViewType::e2D;
         viewInfo.format = format;
-        viewInfo.subresourceRange.aspectMask = vk::ImageAspectFlags(vk::ImageAspectFlagBits::eColor);
+        viewInfo.subresourceRange.aspectMask = aspectFlags;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -557,22 +563,39 @@ private:
         colorAttachmentRef.attachment = 0;
         colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
+        vk::AttachmentDescription depthAttachment{};
+        depthAttachment.format = findDepthFormat();
+        depthAttachment.samples = vk::SampleCountFlagBits::e1;
+        depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+        depthAttachment.storeOp = vk::AttachmentStoreOp::eDontCare;
+        depthAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+        depthAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+        depthAttachment.initialLayout = vk::ImageLayout::eUndefined;
+        depthAttachment.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+
+        vk::AttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+
         vk::SubpassDescription subpass = {};
         subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;  // Unlike color attachments, a subpass can only use a single depth (+stencil) attachment.
 
         vk::SubpassDependency dependency = {};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
-        dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests;
         //dependency.srcAccessMask = 0;
-        dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite;
+        dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests;
+        dependency.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eColorAttachmentWrite;
+
+        std::array<vk::AttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
 
         vk::RenderPassCreateInfo renderPassInfo = {};
-        renderPassInfo.attachmentCount = 1;
-        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());;
+        renderPassInfo.pAttachments = attachments.data();
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpass;
         renderPassInfo.dependencyCount = 1;
@@ -689,6 +712,19 @@ private:
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencil{};
+        // The depthTestEnable field specifies if the depth of new fragments should be compared to the depth buffer to see if they should be discarded.
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        // Specify the comparison that is performed to keep or discard fragments.
+        depthStencil.depthCompareOp = vk::CompareOp::eLess;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.minDepthBounds = 0.0f; // Optional
+        depthStencil.maxDepthBounds = 1.0f; // Optional
+        depthStencil.stencilTestEnable = VK_FALSE;
+        // depthStencil.front = {}; // Optional
+        // depthStencil.back = {}; // Optional
+
         vk::PipelineColorBlendAttachmentState colorBlendAttachment = {};
         colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
         colorBlendAttachment.blendEnable = VK_FALSE;
@@ -724,6 +760,7 @@ private:
         pipelineInfo.pRasterizationState = &rasterizer;
         pipelineInfo.pMultisampleState = &multisampling;
         pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.pDepthStencilState = &depthStencil;
         pipelineInfo.layout = pipelineLayout;
         pipelineInfo.renderPass = renderPass;
         pipelineInfo.subpass = 0;
@@ -741,14 +778,15 @@ private:
         swapChainFramebuffers.resize(swapChainImageViews.size());
 
         for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-            vk::ImageView attachments[] = {
-                swapChainImageViews[i]
+            std::array<vk::ImageView, 2> attachments = {
+                swapChainImageViews[i],
+                depthImageView
             };
 
             vk::FramebufferCreateInfo framebufferInfo = {};
             framebufferInfo.renderPass = renderPass;
-            framebufferInfo.attachmentCount = 1;
-            framebufferInfo.pAttachments = attachments;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            framebufferInfo.pAttachments = attachments.data();
             framebufferInfo.width = swapChainExtent.width;
             framebufferInfo.height = swapChainExtent.height;
             framebufferInfo.layers = 1;
@@ -949,8 +987,7 @@ private:
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, 
                      vk::MemoryPropertyFlags properties, vk::Image& image, vk::DeviceMemory& imageMemory) {
         // vk::Format texFormat = vk::Format::eR8G8B8A8Srgb;
-        // 
-        vk::ImageCreateInfo texImgInfo({}, vk::ImageType::e2D, format,
+        vk::ImageCreateInfo imgInfo({}, vk::ImageType::e2D, format,
             { width, height, 1 },
             1, 1, vk::SampleCountFlagBits::e1,
             tiling, usage, vk::SharingMode::eExclusive, 
@@ -958,7 +995,7 @@ private:
         );
 
         try {
-            textureImage = device->createImage(texImgInfo);
+            image = device->createImage(imgInfo);
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create image!");
@@ -999,6 +1036,7 @@ private:
         throw std::runtime_error("failed to find supported format!");
     }
 
+    // Select a format with a depth component that supports usage as depth attachment:
     vk::Format findDepthFormat() {
         vk::Format depthFormat;
         try {
@@ -1022,20 +1060,22 @@ private:
     void createDepthResources() {
         // Find the depth format first
         vk::Format depthFormat = findDepthFormat();
-
+      ;
         vk::ImageCreateInfo depthImgInfo({}, vk::ImageType::e2D, depthFormat,
                                          { swapChainExtent.width, swapChainExtent.height, 1 },
                                            1, 1, vk::SampleCountFlagBits::e1,
                                            vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
                                            vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined);
+       
+        createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlags(vk::ImageUsageFlagBits::eDepthStencilAttachment), 
+                    vk::MemoryPropertyFlags(vk::MemoryPropertyFlagBits::eDeviceLocal),
+                    depthImage, depthImageMemory);
 
-        depthImage = device->createImage(depthImgInfo);
-
-        vk::ImageViewCreateInfo createInfo = {};
-        createInfo.image = depthImage;
-        createInfo.viewType = vk::ImageViewType::e2D;
-        createInfo.format = depthFormat;
-        depthImageView = device->createImageView(createInfo);
+        depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlags(vk::ImageAspectFlagBits::eDepth));
+        
+        // The undefined layout can be used as initial layout
+        // transitionImageLayout(depthImage, depthFormat, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
 
     void createVertexBuffer() {
@@ -1273,9 +1313,11 @@ private:
             renderPassInfo.renderArea.offset = VULKAN_HPP_NAMESPACE::Offset2D{ 0, 0 };
             renderPassInfo.renderArea.extent = swapChainExtent;
 
-            vk::ClearValue clearColor = { std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f } };
-            renderPassInfo.clearValueCount = 1;
-            renderPassInfo.pClearValues = &clearColor;
+            std::array<vk::ClearValue, 2> clearValues{};
+            clearValues[0].color = std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f };
+            clearValues[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
 
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
@@ -1394,7 +1436,7 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
