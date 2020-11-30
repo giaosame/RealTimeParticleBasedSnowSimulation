@@ -32,6 +32,18 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 const std::string TEXTURE_PATH = "../assets/images/viking_room.png";
 const std::string MODEL_PATH = "../assets/models/viking_room.obj";
 
+bool leftMouseDown = false;
+bool rightMouseDown = false;
+double previousX = 0.0;
+double previousY = 0.0;
+
+float r = 5.0f;
+float theta = 0.0f;
+float phi = 0.0f;
+
+glm::vec3 eye = glm::vec3(0.0f, 0.0f, 5.0f);
+glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_LUNARG_standard_validation"
 };
@@ -217,6 +229,49 @@ private:
 
     bool framebufferResized = false;
 
+    //call back for the mouse down
+    static void mouseDownCallback(GLFWwindow* window, int button, int action, int mods) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            if (action == GLFW_PRESS) {
+                leftMouseDown = true;
+                glfwGetCursorPos(window, &previousX, &previousY);
+            }
+            else if (action == GLFW_RELEASE) {
+                leftMouseDown = false;
+            }
+        }
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            if (action == GLFW_PRESS) {
+                rightMouseDown = true;
+                glfwGetCursorPos(window, &previousX, &previousY);
+            }
+            else if (action == GLFW_RELEASE) {
+                rightMouseDown = false;
+            }
+        }
+    }
+
+
+    static void mouseMoveCallback(GLFWwindow* window, double xPosition, double yPosition) {
+        if (leftMouseDown) {
+            double sensitivity = 0.5;
+            float deltaX = static_cast<float>((previousX - xPosition) * sensitivity);
+            float deltaY = static_cast<float>((previousY - yPosition) * sensitivity);
+
+            updateOrbit(deltaX, deltaY, 0.0f);
+
+            previousX = xPosition;
+            previousY = yPosition;
+        }
+        else if (rightMouseDown) {
+            double deltaZ = static_cast<float>((previousY - yPosition) * 0.05);
+
+            updateOrbit(0.0f, 0.0f, deltaZ);
+
+            previousY = yPosition;
+        }
+    }
+
     void initWindow() {
         glfwInit();
 
@@ -225,7 +280,26 @@ private:
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+
+        glfwSetMouseButtonCallback(window, mouseDownCallback);
+        glfwSetCursorPosCallback(window, mouseMoveCallback);
     }
+
+    static void updateOrbit(float deltaX, float deltaY, float deltaZ) {
+        theta += deltaX;
+        phi += deltaY;
+        r = glm::clamp(r - deltaZ, 1.0f, 50.0f);
+
+        float radTheta = glm::radians(theta);
+        float radPhi = glm::radians(phi);
+
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), radTheta, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), radPhi, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 finalTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * rotation * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, r));
+        viewMat = glm::inverse(finalTransform);
+        //update pos
+        eye = glm::vec3(-viewMat[3][0], -viewMat[3][1], -viewMat[3][2]);
+    }
+
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
         auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
@@ -1502,8 +1576,8 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(0.0f, 3.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        ubo.view = viewMat;
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
         ubo.proj[1][1] *= -1;
 
@@ -1692,9 +1766,10 @@ private:
     }
 };
 
+
+
 int main() {
     HelloTriangleApplication app;
-
     try {
         app.run();
     }
