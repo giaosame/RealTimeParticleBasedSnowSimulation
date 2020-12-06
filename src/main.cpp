@@ -27,8 +27,11 @@
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
+const float BALL_SCALE_FACTOR = 0.01f;
+const glm::mat4 BALL_SCALE_MAT = glm::scale(glm::mat4(1), glm::vec3(BALL_SCALE_FACTOR, BALL_SCALE_FACTOR, BALL_SCALE_FACTOR));
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
+const std::string BALL_PATH = "../assets/models/sphere.obj";
 const std::string TEXTURE_PATH = "../assets/images/viking_room.png";
 const std::string MODEL_PATH = "../assets/models/viking_room.obj";
 
@@ -162,7 +165,7 @@ namespace std {
 //    4, 5, 6, 6, 7, 4
 //};
 
-class HelloTriangleApplication {
+class MyVulkanRenderer {
 public:
     void run() {
         initWindow();
@@ -302,7 +305,7 @@ private:
 
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        auto app = reinterpret_cast<MyVulkanRenderer*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
     }
 
@@ -1097,31 +1100,51 @@ private:
             return;
         }
 
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+        tinyobj::attrib_t ball_attrib;
+        std::vector<tinyobj::shape_t> ball_shapes;
+        std::vector<tinyobj::material_t> ball_materials;
+        if (!tinyobj::LoadObj(&ball_attrib, &ball_shapes, &ball_materials, &warn, &err, BALL_PATH.c_str())) {
+            std::cerr << warn + err << std::endl;
+            return;
+        }
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices;
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
 
-                vertex.pos = {
+                const glm::vec3 pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
+                const glm::mat4 BALL_TRANS_MAT = glm::translate(glm::mat4(1), pos);
+                
+                for (const auto& ball_shape : ball_shapes) {
+                    for (const auto& ball_index : ball_shape.mesh.indices) {
+                        Vertex vertex{};
 
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
+                        vertex.pos = {
+                            ball_attrib.vertices[3 * ball_index.vertex_index + 0],
+                            ball_attrib.vertices[3 * ball_index.vertex_index + 1],
+                            ball_attrib.vertices[3 * ball_index.vertex_index + 2]
+                        };
 
-                vertex.color = { 1.0f, 1.0f, 1.0f };
+                        vertex.pos = glm::vec3(BALL_TRANS_MAT * BALL_SCALE_MAT * glm::vec4(vertex.pos, 1.f));
+                        vertex.texCoord = { 0.0f, 0.0f};
+                        vertex.color = { 1.0f, 1.0f, 1.0f };
 
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
+                        if (uniqueVertices.count(vertex) == 0) {
+                            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                            vertices.push_back(vertex);
+                        }
+                        indices.push_back(uniqueVertices[vertex]);
+                    }
                 }
-                indices.push_back(uniqueVertices[vertex]);
             }
         }
+
+        std::cout << indices.size() << std::endl;
     }
 
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, 
@@ -1450,7 +1473,7 @@ private:
             vk::RenderPassBeginInfo renderPassInfo = {};
             renderPassInfo.renderPass = renderPass;
             renderPassInfo.framebuffer = swapChainFramebuffers[i];
-            renderPassInfo.renderArea.offset = VULKAN_HPP_NAMESPACE::Offset2D{ 0, 0 };
+            renderPassInfo.renderArea.offset = vk::Offset2D{ 0, 0 };
             renderPassInfo.renderArea.extent = swapChainExtent;
 
             std::array<vk::ClearValue, 2> clearValues{};
@@ -1465,7 +1488,7 @@ private:
             vk::Buffer vertexBuffers[] = { vertexBuffer };
             vk::DeviceSize offsets[] = { 0 };
             commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
-            commandBuffers[i].bindIndexBuffer(indexBuffer, 0, VULKAN_HPP_NAMESPACE::IndexType::eUint32);
+            commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
 
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
             commandBuffers[i].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
@@ -1769,7 +1792,7 @@ private:
 
 
 int main() {
-    HelloTriangleApplication app;
+    MyVulkanRenderer app;
     try {
         app.run();
     }
