@@ -20,11 +20,14 @@
 #include <array>
 #include <optional>
 #include <set>
-#include <unordered_map>
 
+#include "kernel.h"
+#include "vertex.h"
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
+const int N_FOR_VIS = 27000;
+const float DT = 0.0017f;
 const int WIDTH = 800;
 const int HEIGHT = 600;
 const float BALL_SCALE_FACTOR = 0.01f;
@@ -40,12 +43,12 @@ bool rightMouseDown = false;
 double previousX = 0.0;
 double previousY = 0.0;
 
-float r = 5.0f;
-float theta = 0.0f;
-float phi = 0.0f;
+float r = 8.0f;
+float theta = 1.0f;
+float phi = -0.7f;
 
-glm::vec3 eye = glm::vec3(0.0f, 0.0f, 5.0f);
-glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+glm::vec3 eye = glm::vec3(0.0f, 0.0f, 10.0f);
+glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_LUNARG_standard_validation"
@@ -93,60 +96,11 @@ struct SwapChainSupportDetails {
     std::vector<vk::PresentModeKHR> presentModes;
 };
 
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec2 texCoord;
-
-    static vk::VertexInputBindingDescription getBindingDescription() {
-        vk::VertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = vk::VertexInputRate::eVertex;
-        return bindingDescription;
-    }
-
-    static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions{};
-
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = vk::Format::eR32G32B32Sfloat;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = vk::Format::eR32G32Sfloat;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
-
-    bool operator==(const Vertex& other) const {
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
-    }
-};
-
 struct UniformBufferObject {
     alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
 };
-
-namespace std {
-    template<> struct std::hash<Vertex> {
-        size_t operator()(Vertex const& vertex) const {
-            return ((std::hash<glm::vec3>()(vertex.pos) ^ 
-                    (std::hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ 
-                    (std::hash<glm::vec2>()(vertex.texCoord) << 1);
-        }
-    };
-}
 
 //const std::vector<Vertex> vertices = {
 //    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
@@ -169,6 +123,7 @@ class MyVulkanRenderer {
 public:
     void run() {
         initWindow();
+        initParticles();
         initVulkan();
         mainLoop();
         cleanup();
@@ -211,7 +166,10 @@ private:
     vk::Pipeline graphicsPipeline;
 
     vk::CommandPool commandPool;
-    
+   
+    Vertex* raw_verts = new Vertex[N_FOR_VIS];
+    uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
+
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     vk::Buffer vertexBuffer;
@@ -309,6 +267,43 @@ private:
         app->framebufferResized = true;
     }
 
+    void initParticles() {
+        // Initialize N-body simulation
+        Boids::initSimulation(N_FOR_VIS);
+
+        // cube 
+        int n = 30;
+        int numParticles = n * n * n;
+        std::vector<Particle> particles;
+        particles.reserve(numParticles);
+        // float l = 0.98f * (float)n / 10.f;
+        float l = (float)n / 10.f;
+
+        int idx = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            for (int j = 0; j < n; ++j)
+            {
+                for (int k = 0; k < n; ++k)
+                {
+                    Particle p = Particle();
+                    p.position = glm::vec3(k * l / (float)n,
+                        j * l / (float)n,
+                        i * l / (float)n);
+                    p.position += glm::vec3(0.05f, 0.05f, 0.05f);
+                    //p.velocity = glm::vec3(1.f, 1.f, 1.f);
+                    particles.push_back(p);
+
+                    raw_verts[idx].pos = p.position;
+                    raw_indices[idx] = idx;
+                    idx++;
+                }
+            }
+        }
+        std::cout << "idx: " << idx << std::endl;
+        Boids::copyParticlesToDevice(particles);
+    }
+
     void initVulkan() {
         createInstance();
         setupDebugCallback();
@@ -340,10 +335,20 @@ private:
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            runCUDA();
             drawFrame();
         }
 
         device->waitIdle();
+    }
+
+    void runCUDA() {
+        // Map OpenGL buffer object for writing from CUDA on a single GPU
+        // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
+        // use this buffer
+
+        Boids::advanceOneStep(DT);
+        Boids::copyParticlesToHost(raw_verts, N_FOR_VIS);
     }
 
     void cleanupSwapChain() {
@@ -782,7 +787,7 @@ private:
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly = {};
-        inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+        inputAssembly.topology = vk::PrimitiveTopology::ePointList;
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
         vk::Viewport viewport = {};
@@ -1108,19 +1113,30 @@ private:
             return;
         }
 
-        std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        // std::unordered_map<Vertex, uint32_t> uniqueVertices;
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
 
-                const glm::vec3 pos = {
+                vertex.pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
-                const glm::mat4 BALL_TRANS_MAT = glm::translate(glm::mat4(1), pos);
                 
-                for (const auto& ball_shape : ball_shapes) {
+                vertex.texCoord = { 0.0f, 0.0f };
+                vertex.color = { 1.0f, 1.0f, 1.0f };
+
+                vertices.push_back(vertex);
+                indices.push_back(indices.size());
+
+                /*if (uniqueVertices.count(vertex) == 0) {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                    vertices.push_back(vertex);
+                }
+                indices.push_back(uniqueVertices[vertex]);*/
+                
+                /*for (const auto& ball_shape : ball_shapes) {
                     for (const auto& ball_index : ball_shape.mesh.indices) {
                         Vertex vertex{};
 
@@ -1140,11 +1156,11 @@ private:
                         }
                         indices.push_back(uniqueVertices[vertex]);
                     }
-                }
+                }*/
             }
         }
 
-        std::cout << indices.size() << std::endl;
+        std::cout << vertices.size() << std::endl;
     }
 
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, 
@@ -1242,17 +1258,18 @@ private:
     }
 
     void createVertexBuffer() {
-        vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+        vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+        // vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
         void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
+        memcpy(data, raw_verts, (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
 
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
@@ -1261,14 +1278,15 @@ private:
     }
 
     void createIndexBuffer() {
-        vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+        vk::DeviceSize bufferSize = sizeof(raw_indices[0]) * N_FOR_VIS;
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
 
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
         void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, indices.data(), (size_t)bufferSize);
+        memcpy(data, raw_indices, (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
@@ -1538,6 +1556,7 @@ private:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
+        updateVertexBuffer(imageIndex);
         updateUniformBuffer(imageIndex);
         vk::SubmitInfo submitInfo = {};
 
@@ -1601,13 +1620,18 @@ private:
         UniformBufferObject ubo{};
         ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
         ubo.view = viewMat;
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+        ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.01f, 15.0f);
         ubo.proj[1][1] *= -1;
 
-        void* data;
-        device->mapMemory(uniformBuffersMemory[currentImage], 0, sizeof(ubo));
+        void* data = device->mapMemory(uniformBuffersMemory[currentImage], 0, sizeof(ubo));
         memcpy(data, &ubo, sizeof(ubo));
         device->unmapMemory(uniformBuffersMemory[currentImage]);
+    }
+
+    void updateVertexBuffer(uint32_t currentImage) {
+        void* data = device->mapMemory(vertexBufferMemory, 0, sizeof(raw_verts[0]) * N_FOR_VIS);
+        memcpy(data, raw_verts, sizeof(raw_verts[0]) * N_FOR_VIS);
+        device->unmapMemory(vertexBufferMemory);
     }
 
     vk::UniqueShaderModule createShaderModule(const std::vector<char>& code) {

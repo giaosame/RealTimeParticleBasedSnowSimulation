@@ -25,6 +25,22 @@ ENDIF(USE_D2D_WSI)
     # Todo : android?
 ENDIF(WIN32)
 
+########################################
+# CUDA Setup
+########################################
+find_package(CUDA 10 REQUIRED)
+include(${CMAKE_MODULE_PATH}/CUDAComputesList.cmake)
+
+list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
+list(APPEND CUDA_NVCC_FLAGS_DEBUG "-g -G")
+set(CUDA_VERBOSE_BUILD ON)
+
+if(WIN32)
+    # Set up include and lib paths
+    set(CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER} CACHE FILEPATH "Host side compiler used by NVCC" FORCE)
+endif(WIN32)
+########################################
+
 # Set preprocessor defines
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -D_USE_MATH_DEFINES")
 
@@ -74,13 +90,20 @@ set(GLM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/glm")
 include_directories(${GLM_INCLUDE_DIR})
 
 set(headers
+    src/cudaMat4.hpp
+    src/kernel.h
+    src/utilityCore.hpp
+    src/Particle.h
+    src/vertex.h
     src/vulkanrenderer.h
     external/tiny_obj_loader.h
     external/stb_image.h
     )
 
 set(sources
+    src/kernel.cu
     src/main.cpp
+    src/utilityCore.cpp
     src/vulkanrenderer.cpp
     )
 
@@ -90,7 +113,8 @@ list(SORT sources)
 source_group(Headers FILES ${headers})
 source_group(Sources FILES ${sources})
 
-add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
+cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
+# add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
 target_link_libraries(
     ${CMAKE_PROJECT_NAME}
     ${LIBRARIES}
