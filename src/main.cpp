@@ -347,7 +347,6 @@ private:
 
     void createComputePipeline()
     {
-        std::cout << "11111111111111111111111" << std::endl;
         auto computeShaderCode = readFile("../src/shaders/comp.spv");
         auto computeShaderModule = createShaderModule(computeShaderCode);
         
@@ -374,17 +373,13 @@ private:
         descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         descriptorSetLayoutCreateInfo.pBindings = bindings.data();
 
-        //if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &computeDescriptorSetLayout) != VK_SUCCESS) {
-        //    throw std::runtime_error("failed to create descriptor Set Layout!");
-        //}
-
         try {
             computeDescriptorSetLayout = device->createDescriptorSetLayout(descriptorSetLayoutCreateInfo);
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
-        std::cout << "222222222222222222222222222222222222" << std::endl;
+
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
@@ -427,15 +422,8 @@ private:
         computeBufferInfo.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
         //computeBufferInfo.range = vertexBufferSize;
 
-        //std::array<vk::WriteDescriptorSet, 1> writeComputeInfo{};
-        ////writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        //writeComputeInfo[0].dstSet = computeDescriptorSet[0];
-        //writeComputeInfo[0].dstBinding = 0;
-        //writeComputeInfo[0].descriptorCount = 1;
-        //writeComputeInfo[0].descriptorType = vk::DescriptorType::eStorageBuffer;
-        //writeComputeInfo[0].pBufferInfo = &computeBufferInfo;
+
         vk::WriteDescriptorSet writeComputeInfo = {};
-        //writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writeComputeInfo.dstSet = computeDescriptorSet[0];
         writeComputeInfo.dstBinding = 0;
         writeComputeInfo.descriptorCount = 1;
@@ -448,7 +436,6 @@ private:
         //device->updateDescriptorSets(static_cast<uint32_t>(writeComputeInfo.size()), writeComputeInfo.data(), 0, nullptr);
 
         device->updateDescriptorSets(1, writeDescriptorSets.data(), 0, nullptr);
-        std::cout << "444444444444444444444444444444" << std::endl;
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
         vk::PipelineLayoutCreateInfo computePipelineLayoutInfo = {};
@@ -494,119 +481,6 @@ private:
 
         return shaderModule;
     }
-    void createComputePipeline2()
-    {/*
-        // CP: 加载shader 文件
-        auto vertShaderCode = readFile("shaders/comp.spv");
-
-        VkShaderModule compShaderModule = createShaderModule2(vertShaderCode);
-
-        VkPipelineShaderStageCreateInfo compShaderStageInfo{};
-        compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        compShaderStageInfo.module = compShaderModule;
-        compShaderStageInfo.pName = "main";
-
-        // ----------------------------------------------set binding-------------------------------------------------------------------------
-        std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {
-        { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
-        };
-        // ----------------------------------------------Create the descriptor set layout-------------------------------------------------
-        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
-        descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorSetLayoutCreateInfo.pNext = nullptr;
-        descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
-        descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
-
-        // create layout
-        if (vkCreateDescriptorSetLayout(*device, &descriptorSetLayoutCreateInfo, nullptr, &ComputeDescriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor Set Layout!");
-        }
-
-        // ------------------------------------------create descriptorpool------------------------------------------------------------------
-        VkDescriptorPoolSize poolSizes[1];
-        poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSizes[0].descriptorCount = 1;
-
-        VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
-        descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        descriptorPoolInfo.pNext = nullptr;
-        descriptorPoolInfo.poolSizeCount = 1;
-        descriptorPoolInfo.pPoolSizes = poolSizes;
-        descriptorPoolInfo.maxSets = 1;
-
-        if (vkCreateDescriptorPool(*device, &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor Pool!");
-        }
-
-        // ------------------------------------Create Descriptor sets for the compute pipeline-----------------------------------------------
-        //std::vector<VkDescriptorSet> computeDescriptorSets;
-
-        VkDescriptorSetAllocateInfo allocInfo = {};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &ComputeDescriptorSetLayout;
-
-
-        // Allocate descriptor sets
-        if (vkAllocateDescriptorSets(*device, &allocInfo, &ComputeDescriptorSet) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate compute descriptor sets");
-        }
-
-        //set the storage buffer
-        VkDescriptorBufferInfo computeBufferInfo = {};
-        computeBufferInfo.buffer = vertexBuffer;
-        computeBufferInfo.offset = 0;
-        //computeBufferInfo.range = 3 * sizeof(Vertex);
-        computeBufferInfo.range = vertexBufferSize;
-
-        VkWriteDescriptorSet writeComputeInfo = {};
-        writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writeComputeInfo.dstSet = ComputeDescriptorSet;
-        writeComputeInfo.dstBinding = 0;
-        writeComputeInfo.descriptorCount = 1;
-        writeComputeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        writeComputeInfo.pBufferInfo = &computeBufferInfo;
-
-        std::vector<VkWriteDescriptorSet> writeDescriptorSets = { writeComputeInfo };
-
-        vkUpdateDescriptorSets(*device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
-        //vkUpdateDescriptorSets(device, 1, &writeComputeInfo, 0, nullptr);
-
-        //// ----------------------------------------------set the pipeline layout--------------------------------------
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { ComputeDescriptorSetLayout };
-
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
-        pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
-        pipelineLayoutInfo.pushConstantRangeCount = 0;
-        pipelineLayoutInfo.pPushConstantRanges = 0;
-
-        if (vkCreatePipelineLayout(*device, &pipelineLayoutInfo, nullptr, &computePipelineLayout) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create pipeline layout");
-        }
-
-        //// -----------------------------------------------Create compute pipeline-----------------------------------------------
-        VkComputePipelineCreateInfo pipelineInfo = {};
-        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        pipelineInfo.stage = compShaderStageInfo;
-        pipelineInfo.layout = computePipelineLayout;
-        //pipelineInfo.pNext = nullptr;
-        //pipelineInfo.flags = 0;
-        //pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-        //pipelineInfo.basePipelineIndex = -1;
-
-        if (vkCreateComputePipelines(*device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create pipeline");
-        }
-
-
-        vkDestroyShaderModule(*device, compShaderModule, nullptr);
-        */
-    }
-
 
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
@@ -1794,9 +1668,9 @@ private:
 
             // Dispatch the compute kernel, with one thread for each vertex
             //vkCmdDispatch(commandBuffers[i], vertices.size(), 1, 1);
-            commandBuffers[i].dispatch(vertices.size(), 1, 1);
+            commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
 
-  /*          // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
+            // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
             vk::BufferMemoryBarrier computeToVertexBarrier = {};
             //computeToVertexBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
             computeToVertexBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
@@ -1805,21 +1679,23 @@ private:
             computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
             computeToVertexBarrier.buffer = vertexBuffer;
             computeToVertexBarrier.offset = 0;
-            computeToVertexBarrier.size = vertexBufferSize;  //vertexBufferSize
+            computeToVertexBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
             //vkCmdPipelineBarrier(commandBuffers[i],
-            //    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk::PipelineStageFlagBits::eComputeShader
+            //    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
             //    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
             //    0,
             //    0, nullptr,
             //    1, &computeToVertexBarrier,
             //    0, nullptr);
-            commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                vk::PipelineStageFlagBits::eVertexInput,
-                0,
+            vk::PipelineStageFlags computeShaderStageFlags(vk::PipelineStageFlagBits::eComputeShader);
+            vk::PipelineStageFlags vertexShaderStageFlags(vk::PipelineStageFlagBits::eVertexInput);
+            commandBuffers[i].pipelineBarrier(computeShaderStageFlags,
+                vertexShaderStageFlags,
+                vk::DependencyFlags(),
                 0, nullptr,
                 1, &computeToVertexBarrier,
-                0, nullptr); */
+                0, nullptr); 
             //commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits)
 
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
@@ -1878,7 +1754,7 @@ private:
             throw std::runtime_error("failed to acquire swap chain image!");
         }
 
-        updateVertexBuffer(imageIndex);
+        //updateVertexBuffer(imageIndex);
         updateUniformBuffer(imageIndex);
         vk::SubmitInfo submitInfo = {};
 
