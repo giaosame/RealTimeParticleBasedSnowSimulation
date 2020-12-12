@@ -134,7 +134,7 @@ private:
     GLFWwindow* window;
 
     vk::UniqueInstance instance;
-    VkDebugUtilsMessengerEXT callback;
+    // VkDebugUtilsMessengerEXT callback;
     vk::SurfaceKHR surface;
 
     vk::PhysicalDevice physicalDevice;
@@ -143,7 +143,6 @@ private:
     vk::Queue graphicsQueue;
     vk::Queue presentQueue; 
     vk::Queue computeQueue;
-
 
     vk::SwapchainKHR swapChain;
     std::vector<vk::Image> swapChainImages;
@@ -317,7 +316,7 @@ private:
 
     void initVulkan() {
         createInstance();
-        setupDebugCallback();
+        // setupDebugCallback();
         createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
@@ -690,9 +689,9 @@ private:
         // surface is created by glfw, therefore not using a Unique handle
         instance->destroySurfaceKHR(surface);
 
-        if (enableValidationLayers) {
+        /*if (enableValidationLayers) {
             DestroyDebugUtilsMessengerEXT(*instance, callback, nullptr);
-        }
+        }*/
 
         glfwDestroyWindow(window);
 
@@ -758,24 +757,24 @@ private:
     }
 
     void setupDebugCallback() {
-        if (!enableValidationLayers) return;
+        //if (!enableValidationLayers) return;
 
-        auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT(
-            vk::DebugUtilsMessengerCreateFlagsEXT(),
-            vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-            vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-            debugCallback,
-            nullptr
-        );
+        //auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT(
+        //    vk::DebugUtilsMessengerCreateFlagsEXT(),
+        //    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+        //    vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+        //    debugCallback,
+        //    nullptr
+        //);
 
-        // NOTE: Vulkan-hpp has methods for this, but they trigger linking errors...
-        //instance->createDebugUtilsMessengerEXT(createInfo);
-        //instance->createDebugUtilsMessengerEXTUnique(createInfo);
+        //// NOTE: Vulkan-hpp has methods for this, but they trigger linking errors...
+        ////instance->createDebugUtilsMessengerEXT(createInfo);
+        ////instance->createDebugUtilsMessengerEXTUnique(createInfo);
 
-        // NOTE: reinterpret_cast is also used by vulkan.hpp internally for all these structs
-        if (CreateDebugUtilsMessengerEXT(*instance, reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(&createInfo), nullptr, &callback) != VK_SUCCESS) {
-            throw std::runtime_error("failed to set up debug callback!");
-        }
+        //// NOTE: reinterpret_cast is also used by vulkan.hpp internally for all these structs
+        //if (CreateDebugUtilsMessengerEXT(*instance, reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(&createInfo), nullptr, &callback) != VK_SUCCESS) {
+        //    throw std::runtime_error("failed to set up debug callback!");
+        //}
     }
 
     void createSurface() {
