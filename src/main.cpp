@@ -424,8 +424,8 @@ private:
         computeBufferInfo.buffer = vertexBuffer;
         computeBufferInfo.offset = 0;
         //computeBufferInfo.range = 3 * sizeof(Vertex);
-        //computeBufferInfo.range = static_cast<uint32_t>(vertices.size() * sizeof(vertices[0]));
-        computeBufferInfo.range = vertexBufferSize;
+        computeBufferInfo.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
+        //computeBufferInfo.range = vertexBufferSize;
 
         //std::array<vk::WriteDescriptorSet, 1> writeComputeInfo{};
         ////writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1831,7 +1831,7 @@ private:
             commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
 
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-            commandBuffers[i].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+            commandBuffers[i].drawIndexed(static_cast<uint32_t>(N_FOR_VIS), 1, 0, 0, 0);
 
             commandBuffers[i].endRenderPass();
 
