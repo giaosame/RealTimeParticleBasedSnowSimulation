@@ -8,9 +8,9 @@
 #include <array>
 
 struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color = { 1,1,1 };
-    glm::vec2 texCoord;
+    glm::vec4 pos;
+    glm::vec4 color = { 1,1,1,1 };
+    glm::vec4 texCoord;
 
     static vk::VertexInputBindingDescription getBindingDescription() {
         vk::VertexInputBindingDescription bindingDescription{};

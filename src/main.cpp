@@ -238,7 +238,6 @@ private:
             double deltaZ = static_cast<float>((previousY - yPosition) * 0.05);
 
             updateOrbit(0.0f, 0.0f, deltaZ);
-
             previousY = yPosition;
         }
     }
@@ -304,7 +303,7 @@ private:
                     //p.velocity = glm::vec3(1.f, 1.f, 1.f);
                     particles.push_back(p);
 
-                    raw_verts[idx].pos = p.position;
+                    raw_verts[idx].pos = glm::vec4(p.position, 1.f);
                     raw_indices[idx] = idx;
                     idx++;
                 }
@@ -332,15 +331,14 @@ private:
         createTextureImageView();
         createTextureSampler();
 
-        loadModel();
+        // loadModel();
         createVertexBuffer();
-        createComputePipeline();
         createIndexBuffer();
+        createComputePipeline();
+        
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
-
-        
         createCommandBuffers();
         createSyncObjects();
     }
@@ -422,7 +420,6 @@ private:
         computeBufferInfo.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
         //computeBufferInfo.range = vertexBufferSize;
 
-
         vk::WriteDescriptorSet writeComputeInfo = {};
         writeComputeInfo.dstSet = computeDescriptorSet[0];
         writeComputeInfo.dstBinding = 0;
@@ -439,9 +436,8 @@ private:
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
         vk::PipelineLayoutCreateInfo computePipelineLayoutInfo = {};
-        //pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         computePipelineLayoutInfo.flags = vk::PipelineLayoutCreateFlags();
-        computePipelineLayoutInfo.setLayoutCount = 1;
+        computePipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
         computePipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
         computePipelineLayoutInfo.pushConstantRangeCount = 0;
         computePipelineLayoutInfo.pPushConstantRanges = 0;
@@ -483,9 +479,10 @@ private:
     }
 
     void mainLoop() {
+        std::cout << sizeof(glm::vec3) << ", " << sizeof(glm::vec4) << ", " << sizeof(Vertex) << std::endl;
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
-            runCUDA();
+            // runCUDA();
             drawFrame();
         }
 
@@ -587,6 +584,7 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createComputePipeline();
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -1252,72 +1250,72 @@ private:
 
     void loadModel()
     {
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-        std::string warn, err;
+        //tinyobj::attrib_t attrib;
+        //std::vector<tinyobj::shape_t> shapes;
+        //std::vector<tinyobj::material_t> materials;
+        //std::string warn, err;
 
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-            std::cerr << warn + err << std::endl;
-            return;
-        }
+        //if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+        //    std::cerr << warn + err << std::endl;
+        //    return;
+        //}
 
-        tinyobj::attrib_t ball_attrib;
-        std::vector<tinyobj::shape_t> ball_shapes;
-        std::vector<tinyobj::material_t> ball_materials;
-        if (!tinyobj::LoadObj(&ball_attrib, &ball_shapes, &ball_materials, &warn, &err, BALL_PATH.c_str())) {
-            std::cerr << warn + err << std::endl;
-            return;
-        }
+        //tinyobj::attrib_t ball_attrib;
+        //std::vector<tinyobj::shape_t> ball_shapes;
+        //std::vector<tinyobj::material_t> ball_materials;
+        //if (!tinyobj::LoadObj(&ball_attrib, &ball_shapes, &ball_materials, &warn, &err, BALL_PATH.c_str())) {
+        //    std::cerr << warn + err << std::endl;
+        //    return;
+        //}
 
-        // std::unordered_map<Vertex, uint32_t> uniqueVertices;
-        for (const auto& shape : shapes) {
-            for (const auto& index : shape.mesh.indices) {
-                Vertex vertex{};
+        //// std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        //for (const auto& shape : shapes) {
+        //    for (const auto& index : shape.mesh.indices) {
+        //        Vertex vertex{};
 
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-                };
-                
-                vertex.texCoord = { 0.0f, 0.0f };
-                vertex.color = { 1.0f, 1.0f, 1.0f };
+        //        vertex.pos = {
+        //            attrib.vertices[3 * index.vertex_index + 0],
+        //            attrib.vertices[3 * index.vertex_index + 1],
+        //            attrib.vertices[3 * index.vertex_index + 2]
+        //        };
+        //        
+        //        vertex.texCoord = { 0.0f, 0.0f };
+        //        vertex.color = { 1.0f, 1.0f, 1.0f };
 
-                vertices.push_back(vertex);
-                indices.push_back(indices.size());
+        //        vertices.push_back(vertex);
+        //        indices.push_back(indices.size());
 
-                /*if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
-                }
-                indices.push_back(uniqueVertices[vertex]);*/
-                
-                /*for (const auto& ball_shape : ball_shapes) {
-                    for (const auto& ball_index : ball_shape.mesh.indices) {
-                        Vertex vertex{};
+        //        /*if (uniqueVertices.count(vertex) == 0) {
+        //            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+        //            vertices.push_back(vertex);
+        //        }
+        //        indices.push_back(uniqueVertices[vertex]);*/
+        //        
+        //        /*for (const auto& ball_shape : ball_shapes) {
+        //            for (const auto& ball_index : ball_shape.mesh.indices) {
+        //                Vertex vertex{};
 
-                        vertex.pos = {
-                            ball_attrib.vertices[3 * ball_index.vertex_index + 0],
-                            ball_attrib.vertices[3 * ball_index.vertex_index + 1],
-                            ball_attrib.vertices[3 * ball_index.vertex_index + 2]
-                        };
+        //                vertex.pos = {
+        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 0],
+        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 1],
+        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 2]
+        //                };
 
-                        vertex.pos = glm::vec3(BALL_TRANS_MAT * BALL_SCALE_MAT * glm::vec4(vertex.pos, 1.f));
-                        vertex.texCoord = { 0.0f, 0.0f};
-                        vertex.color = { 1.0f, 1.0f, 1.0f };
+        //                vertex.pos = glm::vec3(BALL_TRANS_MAT * BALL_SCALE_MAT * glm::vec4(vertex.pos, 1.f));
+        //                vertex.texCoord = { 0.0f, 0.0f};
+        //                vertex.color = { 1.0f, 1.0f, 1.0f };
 
-                        if (uniqueVertices.count(vertex) == 0) {
-                            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                            vertices.push_back(vertex);
-                        }
-                        indices.push_back(uniqueVertices[vertex]);
-                    }
-                }*/
-            }
-        }
+        //                if (uniqueVertices.count(vertex) == 0) {
+        //                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+        //                    vertices.push_back(vertex);
+        //                }
+        //                indices.push_back(uniqueVertices[vertex]);
+        //            }
+        //        }*/
+        //    }
+        //}
 
-        std::cout << vertices.size() << std::endl;
+        //std::cout << vertices.size() << std::endl;
     }
 
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, 
@@ -1426,7 +1424,10 @@ private:
         memcpy(data, raw_verts, (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+        createBuffer(bufferSize, 
+                     vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst | 
+                     vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, 
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
 
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
@@ -1570,7 +1571,7 @@ private:
 
     vk::CommandBuffer beginSingleTimeCommands() {
         vk::CommandBufferAllocateInfo allocInfo{};
-        allocInfo.level = VULKAN_HPP_NAMESPACE::CommandBufferLevel::ePrimary;
+        allocInfo.level = vk::CommandBufferLevel::ePrimary;
         allocInfo.commandPool = commandPool;
         allocInfo.commandBufferCount = 1;
 
@@ -1667,7 +1668,6 @@ private:
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
 
             // Dispatch the compute kernel, with one thread for each vertex
-            //vkCmdDispatch(commandBuffers[i], vertices.size(), 1, 1);
             commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
 
             // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input

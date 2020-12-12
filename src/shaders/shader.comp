@@ -15,12 +15,11 @@ layout(set = 0, binding = 0) buffer Vertices {
 	Vertex vertices[];
 };
 
-
 void main() {
 
 	uint index = gl_GlobalInvocationID.x;
 	const float a = 0.05 * 3.14159 / 180.0;
-	vertices[index].color.xyz *= 0.996;
+	vertices[index].position += vec3(0.004, 0.004, 0.004);
 	//vertices[index].position += vec3(0.004, 0.004, 0.004);
 	
 }

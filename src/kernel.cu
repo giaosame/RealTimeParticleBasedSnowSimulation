@@ -1089,7 +1089,7 @@ __global__ void kernCopyParticlesToVertices(int N, Particle* particles, Vertex* 
         return;
     }
 
-    verts[index].pos = particles[index].position;
+    // verts[index].pos = particles[index].position;
 }
 
 
