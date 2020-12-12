@@ -51,7 +51,7 @@ glm::vec3 eye = glm::vec3(0.0f, 0.0f, 10.0f);
 glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 const std::vector<const char*> validationLayers = {
-    "VK_LAYER_LUNARG_standard_validation"
+    "VK_LAYER_KHRONOS_validation"
 };
 
 const std::vector<const char*> deviceExtensions = {
@@ -84,9 +84,10 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
+    std::optional<uint32_t> computeFamily;
 
     bool isComplete() {
-        return graphicsFamily.has_value() && presentFamily.has_value();
+        return graphicsFamily.has_value() && presentFamily.has_value() && computeFamily.has_value();
     }
 };
 
@@ -140,7 +141,9 @@ private:
     vk::UniqueDevice device;
 
     vk::Queue graphicsQueue;
-    vk::Queue presentQueue;
+    vk::Queue presentQueue; 
+    vk::Queue computeQueue;
+
 
     vk::SwapchainKHR swapChain;
     std::vector<vk::Image> swapChainImages;
@@ -187,6 +190,14 @@ private:
     std::vector<vk::Semaphore> renderFinishedSemaphores;
     std::vector<vk::Fence> inFlightFences;
     size_t currentFrame = 0;
+
+    // for compute pipeline
+    vk::PipelineLayout computePipelineLayout;
+    vk::Pipeline computePipeline;
+    vk::DescriptorSetLayout computeDescriptorSetLayout;
+    vk::DescriptorPool computeDescriptorPool;
+    std::vector<vk::DescriptorSet> computeDescriptorSet;
+    const uint32_t vertexBufferSize = static_cast<uint32_t>(vertices.size() * sizeof(vertices[0]));
 
     bool framebufferResized = false;
 
@@ -324,13 +335,279 @@ private:
 
         loadModel();
         createVertexBuffer();
+        createComputePipeline();
         createIndexBuffer();
         createUniformBuffers();
         createDescriptorPool();
         createDescriptorSets();
+
+        
         createCommandBuffers();
         createSyncObjects();
     }
+
+    void createComputePipeline()
+    {
+        std::cout << "11111111111111111111111" << std::endl;
+        auto computeShaderCode = readFile("../src/shaders/comp.spv");
+        auto computeShaderModule = createShaderModule(computeShaderCode);
+        
+        vk::PipelineShaderStageCreateInfo computeShaderStageInfo = {};
+        computeShaderStageInfo.flags = vk::PipelineShaderStageCreateFlags();
+        computeShaderStageInfo.stage = vk::ShaderStageFlagBits::eCompute;
+        computeShaderStageInfo.module = *computeShaderModule;
+        computeShaderStageInfo.pName = "main";
+
+        vk::DescriptorSetLayoutBinding computeLayoutBinding{};
+        computeLayoutBinding.binding = 0;
+        computeLayoutBinding.descriptorCount = 1;
+        computeLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding.pImmutableSamplers = nullptr;
+        // Indicate that we intend to use the combined image sampler descriptor in the fragment shader.
+        computeLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding };
+
+        vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+        //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        descriptorSetLayoutCreateInfo.flags = vk::DescriptorSetLayoutCreateFlags();
+        descriptorSetLayoutCreateInfo.pNext = nullptr;
+        descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+
+        //if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, nullptr, &computeDescriptorSetLayout) != VK_SUCCESS) {
+        //    throw std::runtime_error("failed to create descriptor Set Layout!");
+        //}
+
+        try {
+            computeDescriptorSetLayout = device->createDescriptorSetLayout(descriptorSetLayoutCreateInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+        std::cout << "222222222222222222222222222222222222" << std::endl;
+        //VkDescriptorPoolSize poolSizes[1];
+        std::array<vk::DescriptorPoolSize, 1> poolSizes{};
+        poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
+        poolSizes[0].descriptorCount = 1;
+
+        vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
+        //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        descriptorPoolInfo.flags = vk::DescriptorPoolCreateFlags();
+        descriptorPoolInfo.pNext = nullptr;
+        descriptorPoolInfo.poolSizeCount = 1;
+        descriptorPoolInfo.pPoolSizes = poolSizes.data();
+        descriptorPoolInfo.maxSets = 1;
+
+        try {
+            computeDescriptorPool = device->createDescriptorPool(descriptorPoolInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create compute descriptor pool!");
+        }
+
+        vk::DescriptorSetAllocateInfo allocInfo = {};
+       // allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = computeDescriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &computeDescriptorSetLayout;
+
+
+        //computeDescriptorSet.resize(1);
+        try {
+            computeDescriptorSet = device->allocateDescriptorSets(allocInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create compute descriptor sets!");
+        }
+        
+        vk::DescriptorBufferInfo computeBufferInfo = {};
+        computeBufferInfo.buffer = vertexBuffer;
+        computeBufferInfo.offset = 0;
+        //computeBufferInfo.range = 3 * sizeof(Vertex);
+        //computeBufferInfo.range = static_cast<uint32_t>(vertices.size() * sizeof(vertices[0]));
+        computeBufferInfo.range = vertexBufferSize;
+
+        //std::array<vk::WriteDescriptorSet, 1> writeComputeInfo{};
+        ////writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        //writeComputeInfo[0].dstSet = computeDescriptorSet[0];
+        //writeComputeInfo[0].dstBinding = 0;
+        //writeComputeInfo[0].descriptorCount = 1;
+        //writeComputeInfo[0].descriptorType = vk::DescriptorType::eStorageBuffer;
+        //writeComputeInfo[0].pBufferInfo = &computeBufferInfo;
+        vk::WriteDescriptorSet writeComputeInfo = {};
+        //writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeComputeInfo.dstSet = computeDescriptorSet[0];
+        writeComputeInfo.dstBinding = 0;
+        writeComputeInfo.descriptorCount = 1;
+        writeComputeInfo.dstArrayElement = 0;
+        writeComputeInfo.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo.pBufferInfo = &computeBufferInfo;
+
+        std::vector<vk::WriteDescriptorSet> writeDescriptorSets = { writeComputeInfo };
+
+        //device->updateDescriptorSets(static_cast<uint32_t>(writeComputeInfo.size()), writeComputeInfo.data(), 0, nullptr);
+
+        device->updateDescriptorSets(1, writeDescriptorSets.data(), 0, nullptr);
+        std::cout << "444444444444444444444444444444" << std::endl;
+        std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
+
+        vk::PipelineLayoutCreateInfo computePipelineLayoutInfo = {};
+        //pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        computePipelineLayoutInfo.flags = vk::PipelineLayoutCreateFlags();
+        computePipelineLayoutInfo.setLayoutCount = 1;
+        computePipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
+        computePipelineLayoutInfo.pushConstantRangeCount = 0;
+        computePipelineLayoutInfo.pPushConstantRanges = 0;
+
+        try {
+            computePipelineLayout = device->createPipelineLayout(computePipelineLayoutInfo);
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create compute pipeline layout!");
+        }
+
+        vk::ComputePipelineCreateInfo computePipelineInfo = {};
+        //pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        computePipelineInfo.flags = vk::PipelineCreateFlags();
+        computePipelineInfo.stage = computeShaderStageInfo;
+        computePipelineInfo.layout = computePipelineLayout;
+
+        try {
+            computePipeline = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
+
+        }
+        catch (vk::SystemError err) {
+            throw std::runtime_error("failed to create compute pipeline!");
+        }
+    }
+
+    VkShaderModule createShaderModule2(const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(*device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
+    void createComputePipeline2()
+    {/*
+        // CP: 加载shader 文件
+        auto vertShaderCode = readFile("shaders/comp.spv");
+
+        VkShaderModule compShaderModule = createShaderModule2(vertShaderCode);
+
+        VkPipelineShaderStageCreateInfo compShaderStageInfo{};
+        compShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        compShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        compShaderStageInfo.module = compShaderModule;
+        compShaderStageInfo.pName = "main";
+
+        // ----------------------------------------------set binding-------------------------------------------------------------------------
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings = {
+        { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr },
+        };
+        // ----------------------------------------------Create the descriptor set layout-------------------------------------------------
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
+        descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        descriptorSetLayoutCreateInfo.pNext = nullptr;
+        descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+        descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
+
+        // create layout
+        if (vkCreateDescriptorSetLayout(*device, &descriptorSetLayoutCreateInfo, nullptr, &ComputeDescriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor Set Layout!");
+        }
+
+        // ------------------------------------------create descriptorpool------------------------------------------------------------------
+        VkDescriptorPoolSize poolSizes[1];
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        poolSizes[0].descriptorCount = 1;
+
+        VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
+        descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        descriptorPoolInfo.pNext = nullptr;
+        descriptorPoolInfo.poolSizeCount = 1;
+        descriptorPoolInfo.pPoolSizes = poolSizes;
+        descriptorPoolInfo.maxSets = 1;
+
+        if (vkCreateDescriptorPool(*device, &descriptorPoolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor Pool!");
+        }
+
+        // ------------------------------------Create Descriptor sets for the compute pipeline-----------------------------------------------
+        //std::vector<VkDescriptorSet> computeDescriptorSets;
+
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &ComputeDescriptorSetLayout;
+
+
+        // Allocate descriptor sets
+        if (vkAllocateDescriptorSets(*device, &allocInfo, &ComputeDescriptorSet) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate compute descriptor sets");
+        }
+
+        //set the storage buffer
+        VkDescriptorBufferInfo computeBufferInfo = {};
+        computeBufferInfo.buffer = vertexBuffer;
+        computeBufferInfo.offset = 0;
+        //computeBufferInfo.range = 3 * sizeof(Vertex);
+        computeBufferInfo.range = vertexBufferSize;
+
+        VkWriteDescriptorSet writeComputeInfo = {};
+        writeComputeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeComputeInfo.dstSet = ComputeDescriptorSet;
+        writeComputeInfo.dstBinding = 0;
+        writeComputeInfo.descriptorCount = 1;
+        writeComputeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writeComputeInfo.pBufferInfo = &computeBufferInfo;
+
+        std::vector<VkWriteDescriptorSet> writeDescriptorSets = { writeComputeInfo };
+
+        vkUpdateDescriptorSets(*device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+        //vkUpdateDescriptorSets(device, 1, &writeComputeInfo, 0, nullptr);
+
+        //// ----------------------------------------------set the pipeline layout--------------------------------------
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { ComputeDescriptorSetLayout };
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+        pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
+        pipelineLayoutInfo.pushConstantRangeCount = 0;
+        pipelineLayoutInfo.pPushConstantRanges = 0;
+
+        if (vkCreatePipelineLayout(*device, &pipelineLayoutInfo, nullptr, &computePipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline layout");
+        }
+
+        //// -----------------------------------------------Create compute pipeline-----------------------------------------------
+        VkComputePipelineCreateInfo pipelineInfo = {};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.stage = compShaderStageInfo;
+        pipelineInfo.layout = computePipelineLayout;
+        //pipelineInfo.pNext = nullptr;
+        //pipelineInfo.flags = 0;
+        //pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        //pipelineInfo.basePipelineIndex = -1;
+
+        if (vkCreateComputePipelines(*device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline");
+        }
+
+
+        vkDestroyShaderModule(*device, compShaderModule, nullptr);
+        */
+    }
+
 
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
@@ -383,6 +660,12 @@ private:
         // NOTE: instance destruction is handled by UniqueInstance, same for device
 
         cleanupSwapChain();
+
+        device->destroyPipeline(computePipeline);
+        device->destroyPipelineLayout(computePipelineLayout);
+        device->destroyDescriptorPool(computeDescriptorPool);
+        device->destroyDescriptorSetLayout(computeDescriptorSetLayout);
+        // destroy std::vector<vk::DescriptorSet> computeDescriptorSet;
 
         // The main texture image is used until the end of the program:
         device->destroySampler(textureSampler);
@@ -526,7 +809,7 @@ private:
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+        std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value(), indices.computeFamily.value() };
 
         float queuePriority = 1.0f;
 
@@ -564,6 +847,7 @@ private:
 
         graphicsQueue = device->getQueue(indices.graphicsFamily.value(), 0);
         presentQueue = device->getQueue(indices.presentFamily.value(), 0);
+        computeQueue = device->getQueue(indices.computeFamily.value(), 0);
     }
 
     void createSwapChain() {
@@ -1269,7 +1553,7 @@ private:
         memcpy(data, raw_verts, (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
 
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
@@ -1386,7 +1670,7 @@ private:
         vk::BufferCreateInfo bufferInfo = {};
         bufferInfo.size = size;
         bufferInfo.usage = usage;
-        bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+        //bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 
         try {
             buffer = device->createBuffer(bufferInfo);
@@ -1463,6 +1747,7 @@ private:
     }
 
     void createCommandBuffers() {
+        QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
         commandBuffers.resize(swapChainFramebuffers.size());
 
         vk::CommandBufferAllocateInfo allocInfo = {};
@@ -1499,6 +1784,44 @@ private:
             clearValues[1].depthStencil = vk::ClearDepthStencilValue{ 1.0f, 0 };
             renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
             renderPassInfo.pClearValues = clearValues.data();
+
+            // Bind the compute pipeline
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
+
+            // Bind descriptor sets for compute
+            //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
+            commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
+
+            // Dispatch the compute kernel, with one thread for each vertex
+            //vkCmdDispatch(commandBuffers[i], vertices.size(), 1, 1);
+            commandBuffers[i].dispatch(vertices.size(), 1, 1);
+
+  /*          // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
+            vk::BufferMemoryBarrier computeToVertexBarrier = {};
+            //computeToVertexBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+            computeToVertexBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+            computeToVertexBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
+            computeToVertexBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+            computeToVertexBarrier.buffer = vertexBuffer;
+            computeToVertexBarrier.offset = 0;
+            computeToVertexBarrier.size = vertexBufferSize;  //vertexBufferSize
+
+            //vkCmdPipelineBarrier(commandBuffers[i],
+            //    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk::PipelineStageFlagBits::eComputeShader
+            //    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            //    0,
+            //    0, nullptr,
+            //    1, &computeToVertexBarrier,
+            //    0, nullptr);
+            commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                vk::PipelineStageFlagBits::eVertexInput,
+                0,
+                0, nullptr,
+                1, &computeToVertexBarrier,
+                0, nullptr); */
+            //commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits)
 
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
@@ -1738,6 +2061,10 @@ private:
         for (const auto& queueFamily : queueFamilies) {
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
                 indices.graphicsFamily = i;
+            }
+
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & vk::QueueFlagBits::eCompute) {
+                indices.computeFamily = i;
             }
 
             if (queueFamily.queueCount > 0 && device.getSurfaceSupportKHR(i, surface)) {
