@@ -26,7 +26,8 @@
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
-const int N_SIDE = 10;
+const int N_GRID_CELLS = 125000;
+const int N_SIDE = 20;
 const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
 const int WIDTH = 800;
@@ -173,6 +174,9 @@ private:
     Vertex* raw_verts = new Vertex[N_FOR_VIS];
     uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
 
+    glm::ivec2* sortIds = new glm::ivec2[N_FOR_VIS];
+    glm::ivec2* startEndIds = new glm::ivec2[N_GRID_CELLS];
+
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
@@ -183,6 +187,14 @@ private:
     // New vertices data
     vk::Buffer vertexBuffer2;
     vk::DeviceMemory vertexBufferMemory2;
+
+    // Storage buffer for sorting
+    vk::Buffer sortIdBuffer;
+    vk::DeviceMemory sortIdBufferMemory;
+
+    // Storage buffer for identifying start and end of grid cell
+    vk::Buffer startEndIdBuffer;
+    vk::DeviceMemory startEndIdBufferMemory;
 
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
@@ -317,6 +329,8 @@ private:
 
                     raw_verts[idx].position = glm::vec4(p.position, 1.f);
                     raw_indices[idx] = idx;
+                   
+                    sortIds[idx] = glm::ivec2(0, idx); // cell_id, vertex_idx
                     idx++;
                 }
             }
@@ -346,6 +360,9 @@ private:
         // loadModel();
         createVertexBuffers();
         createIndexBuffer();
+        createSortIdBuffer();
+        createStartEndIdBuffer();
+
         createComputePipeline("../src/shaders/physicsCompute.spv", computePipelinePhysics);
         createComputePipeline("../src/shaders/sorting.spv", computePipelineSorting);
         createComputePipeline("../src/shaders/findStartEnd.spv", computePipelineFindStartEnd);
@@ -382,7 +399,21 @@ private:
         computeLayoutBinding2.pImmutableSamplers = nullptr;
         computeLayoutBinding2.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2 };
+        vk::DescriptorSetLayoutBinding computeLayoutBinding3{};
+        computeLayoutBinding3.binding = 2;
+        computeLayoutBinding3.descriptorCount = 1;
+        computeLayoutBinding3.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding3.pImmutableSamplers = nullptr;
+        computeLayoutBinding3.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        vk::DescriptorSetLayoutBinding computeLayoutBinding4{};
+        computeLayoutBinding4.binding = 3;
+        computeLayoutBinding4.descriptorCount = 1;
+        computeLayoutBinding4.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding4.pImmutableSamplers = nullptr;
+        computeLayoutBinding4.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2, computeLayoutBinding3, computeLayoutBinding4 };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -401,7 +432,7 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 2;
+        poolSizes[0].descriptorCount = 4;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -461,7 +492,35 @@ private:
         writeComputeInfo2.descriptorType = vk::DescriptorType::eStorageBuffer;
         writeComputeInfo2.pBufferInfo = &computeBufferInfo2;
 
-        std::array<vk::WriteDescriptorSet, 2> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2 };
+        // Set descriptor set for the sort ids
+        vk::DescriptorBufferInfo computeBufferInfo3 = {};
+        computeBufferInfo3.buffer = sortIdBuffer;
+        computeBufferInfo3.offset = 0;
+        computeBufferInfo3.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(glm::ivec2));
+
+        vk::WriteDescriptorSet writeComputeInfo3 = {};
+        writeComputeInfo3.dstSet = computeDescriptorSet[0];
+        writeComputeInfo3.dstBinding = 2;
+        writeComputeInfo3.descriptorCount = 1;
+        writeComputeInfo3.dstArrayElement = 0;
+        writeComputeInfo3.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo3.pBufferInfo = &computeBufferInfo3;
+
+        // Set descriptor set for the sort ids
+        vk::DescriptorBufferInfo computeBufferInfo4 = {};
+        computeBufferInfo4.buffer = startEndIdBuffer;
+        computeBufferInfo4.offset = 0;
+        computeBufferInfo4.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(glm::ivec2));
+
+        vk::WriteDescriptorSet writeComputeInfo4 = {};
+        writeComputeInfo4.dstSet = computeDescriptorSet[0];
+        writeComputeInfo4.dstBinding = 3;
+        writeComputeInfo4.descriptorCount = 1;
+        writeComputeInfo4.dstArrayElement = 0;
+        writeComputeInfo4.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo4.pBufferInfo = &computeBufferInfo3;
+
+        std::array<vk::WriteDescriptorSet, 4> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2, writeComputeInfo3, writeComputeInfo4 };
         device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
@@ -581,6 +640,11 @@ private:
 
         device->destroyBuffer(indexBuffer);
         device->freeMemory(indexBufferMemory);
+
+        device->destroyBuffer(sortIdBuffer);
+        device->freeMemory(sortIdBufferMemory);
+        device->destroyBuffer(startEndIdBuffer);
+        device->freeMemory(startEndIdBufferMemory);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device->destroySemaphore(renderFinishedSemaphores[i]);
@@ -1501,6 +1565,48 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
+    void createSortIdBuffer() {
+        vk::DeviceSize bufferSize = sizeof(glm::ivec2) * N_FOR_VIS;
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, sortIds, (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, sortIdBuffer, sortIdBufferMemory);
+
+        copyBuffer(stagingBuffer, sortIdBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
+    void createStartEndIdBuffer() {
+        vk::DeviceSize bufferSize = sizeof(glm::ivec2) * N_GRID_CELLS;
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, startEndIds, (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, startEndIdBuffer, startEndIdBufferMemory);
+
+        copyBuffer(stagingBuffer, startEndIdBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
     void createUniformBuffers() {
         vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -1707,7 +1813,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelinePhysics);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1767,7 +1873,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelinePhysics);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);

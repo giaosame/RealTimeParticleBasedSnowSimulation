@@ -3,7 +3,7 @@
 
 #define WORKGROUP_SIZE 64
 #define PI 3.1415926f
-#define PARTICLE_COUNT 1000
+#define PARTICLE_COUNT 8000
 
 //layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
@@ -49,7 +49,7 @@ void main() {
 	float FminW = 0.12275f;
 	float FmaxW = 10000.f;
 
-	float damping = 0.98f;
+	float damping = 0.95f;
 	float boundry_damping = 0.5f;
 
 	vec3 gravity = vec3(0.f, -9.82f, 0.f);
@@ -172,7 +172,7 @@ void main() {
 
 				float tanCoeff = tan(angle_of_repose);   // considering
 
-				vec3 Ft = ut * distance(forces, vec3(0.f)) * tanCoeff * 1.5f;    // length?
+				vec3 Ft = ut * distance(forces, vec3(0.f)) * tanCoeff * 1.f;    // length?
 				//vec3 Ft = ut * length(forces) * tanCoeff * 1.f;
 				cohesiveForces += Ft;
 			}
