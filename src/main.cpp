@@ -26,7 +26,8 @@
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
-const int N_FOR_VIS = 1000;
+const int N_SIDE = 10;
+const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -288,29 +289,29 @@ private:
         Boids::initSimulation(N_FOR_VIS);
 
         // cube 
-        int n = 10;
-        int numParticles = n * n * n;
+
+        int numParticles = N_SIDE * N_SIDE * N_SIDE;
         std::vector<Particle> particles;
         particles.reserve(numParticles);
         // float l = 0.98f * (float)n / 10.f;
-        float l = (float)n / 10.f;
+        float l = (float)N_SIDE / 10.f;
 
         int idx = 0;
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < N_SIDE; ++i)
         {
-            for (int j = 0; j < n; ++j)
+            for (int j = 0; j < N_SIDE; ++j)
             {
-                for (int k = 0; k < n; ++k)
+                for (int k = 0; k < N_SIDE; ++k)
                 {
                     Particle p = Particle();
-                    p.position = glm::vec3(k * l / (float)n,
-                        j * l / (float)n,
-                        i * l / (float)n);
+                    p.position = glm::vec3(k * l / (float)N_SIDE,
+                        j * l / (float)N_SIDE,
+                        i * l / (float)N_SIDE);
                     p.position += glm::vec3(0.05f, 0.05f, 0.05f);
                     //p.velocity = glm::vec3(1.f, 1.f, 1.f);
                     particles.push_back(p);
 
-                    raw_verts[idx].pos = glm::vec4(p.position, 1.f);
+                    raw_verts[idx].position = glm::vec4(p.position, 1.f);
                     raw_indices[idx] = idx;
                     idx++;
                 }
@@ -394,7 +395,7 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 2;
+        poolSizes[0].descriptorCount = 5;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1630,7 +1631,7 @@ private:
         device->freeCommandBuffers(commandPool, 1, &commandBuffer);
     }
 
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    void copyBuffer(vk::Buffer& srcBuffer, vk::Buffer& dstBuffer, const vk::DeviceSize& size) {
         vk::CommandBuffer commandBuffer = beginSingleTimeCommands();
 
         vk::BufferCopy copyRegion{};
@@ -1730,8 +1731,9 @@ private:
                 0, nullptr); 
             //commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits)
 
-            vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
-            copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
+            //vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+            //copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
+            //std::swap(descriptorSets[0], descriptorSets[1]);
 
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
@@ -1790,6 +1792,10 @@ private:
         }
 
         //updateVertexBuffer(imageIndex);
+
+        vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+        copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
+        //std::swap(descriptorSets[0], descriptorSets[1]);
         updateUniformBuffer(imageIndex);
         vk::SubmitInfo submitInfo = {};
 
@@ -1842,6 +1848,7 @@ private:
         }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        
     }
 
     // Generate a new transformation every frame to make the geometry spin around. 

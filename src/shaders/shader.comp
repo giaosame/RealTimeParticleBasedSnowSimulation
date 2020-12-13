@@ -52,7 +52,7 @@ void main() {
 	float damping = 0.95f;
 	float boundry_damping = 0.5f;
 
-	vec3 gravity = vec3(0.f, -9.82f, 0.f);
+	vec3 gravity = vec3(0.f, -50.82f, 0.f);
 
 	float Kf = 50.f;
 	float angle_of_repose = 38.f / 180.f * PI;
@@ -63,10 +63,10 @@ void main() {
 	//p.position += vec4(0.0004, 0.0004, 0.0004, 0.f);
 
 	Vertex p = verticesA[index];
-	vec4 pos = p.position;
+	vec3 pos = p.position.xyz;
 
 	// find neighbors
-	vec4 pos_temp;
+	vec3 pos_temp;
 	int neighborCount = 0;
 	int neighborIdx[50];
 	for(int i = 0; i < 50; ++i)
@@ -76,7 +76,7 @@ void main() {
 	{	
 		if(i == index) 
 			continue;
-		pos_temp = verticesA[i].position;
+		pos_temp = verticesA[i].position.xyz;
 
 		if(distance(pos_temp, pos) < neighborRadius)
 		{
@@ -88,7 +88,7 @@ void main() {
 	float temp1 = neighborCount / verticesA[index].attr2.x;
 	if(temp1 < 0.75f && temp1 > 0.f)
 	{
-		verticesA[index].attr2.y = 1.f;
+		verticesB[index].attr2.y = 1.f;
 	}
 	else
 	{
@@ -100,11 +100,12 @@ void main() {
 	vec3 positiveForces = vec3(0.f, 0.f, 0.f);
 	vec3 negitiveForces = vec3(0.f, 0.f, 0.f);
 	float compressiveForces = 0.f;
-
+	
 	// evaluate cohesive forces
 	for(int i = 0; i < neighborCount; ++i)
 	{
-		Vertex pNeighbor = verticesA[i];
+		int neighborIndex = neighborIdx[i];
+		Vertex pNeighbor = verticesA[neighborIndex];
 		float dist = distance(p.position, pNeighbor.position);
 
 		if(pNeighbor.attr2.y == -1 && p.attr2.y == -1 && dist > (p.attr1.x + pNeighbor.attr1.x))
@@ -178,10 +179,12 @@ void main() {
 				//vec3 Ft = ut * length(forces) * tanCoeff * 1.f;
 				cohesiveForces += Ft;
 			}
+			
 		}
 
 	}
 
+	
 	// evaluate compression
 	float minXSquare = min(positiveForces.x * positiveForces.x, negitiveForces.x * negitiveForces.x);
 	float minYSquare = min(positiveForces.y * positiveForces.y, negitiveForces.y * negitiveForces.y);
@@ -211,7 +214,7 @@ void main() {
 		vec3 xNew = p.position.xyz + vNew * dt;
 
 		// hit the ground
-		if (xNew.y < p.attr1.x || xNew.y > length - p.attr1.x)
+		if (xNew.y < p.attr1.x)  // || xNew.y > length - p.attr1.x
 		{
 			// moving the particle to the surface of the wall
 			if (xNew.y < p.attr1.x)
@@ -234,7 +237,7 @@ void main() {
 			vNew = vn + vt * max(0.f, 1.f - Kf * (distance(vn, vec3(0.f)) / distance(vt, vec3(0.f))));
 			vNew *= boundry_damping;
 		}
-
+		
 		if (xNew.x < p.attr1.x || xNew.x > length - p.attr1.x)
 		{
 			// moving the particle to the surface of the wall
@@ -282,14 +285,14 @@ void main() {
 			vNew = vn + vt * max(0.f, 1.f - Kf * (distance(vn, vec3(0.f)) / distance(vt, vec3(0.f))));
 			vNew *= boundry_damping;
 		}
-
+		
 		// update the velocity and position
 		verticesB[index].velocity.xyz = vNew * damping;
 		verticesB[index].position.xyz = xNew;
 	}
 	
 	//const float a = 0.05 * 3.14159 / 180.0;
-	//verticesA[index].position += vec4(0.0004, 0.0004, 0.0004, 0.f);
+	//verticesB[index].position += vec4(0.0004, 0.0004, 0.0004, 0.f);
 	//vertices[index].velocity *= 0.9999;
 	
 }
