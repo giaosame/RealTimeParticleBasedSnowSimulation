@@ -142,7 +142,7 @@ private:
     vk::UniqueDevice device;
 
     vk::Queue graphicsQueue;
-    vk::Queue presentQueue; 
+    vk::Queue presentQueue;
     vk::Queue computeQueue;
 
     vk::SwapchainKHR swapChain;
@@ -169,7 +169,7 @@ private:
     vk::Pipeline graphicsPipeline;
 
     vk::CommandPool commandPool;
-   
+
     Vertex* raw_verts = new Vertex[N_FOR_VIS];
     uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
 
@@ -200,15 +200,15 @@ private:
 
     // for compute pipeline
     vk::PipelineLayout computePipelineLayout;
-    
+    vk::Pipeline computePipelinePhysics;
+    vk::Pipeline computePipelineSorting;
+    vk::Pipeline computePipelineFindStartEnd;
     vk::DescriptorSetLayout computeDescriptorSetLayout;
     vk::DescriptorPool computeDescriptorPool;
     std::vector<vk::DescriptorSet> computeDescriptorSet;
     const uint32_t vertexBufferSize = static_cast<uint32_t>(vertices.size() * sizeof(vertices[0]));
 
-    vk::Pipeline computePipelinePhysics;
-    vk::Pipeline computePipelineSorting;
-    vk::Pipeline computePipelineFindStartEnd;
+
 
     bool framebufferResized = false;
 
@@ -347,7 +347,7 @@ private:
         createVertexBuffers();
         createIndexBuffer();
         createComputePipeline("../src/shaders/physicsCompute.spv", computePipelinePhysics);
-        createComputePipeline("../src/shaders/sorting.spv", computePipelineSorting); 
+        createComputePipeline("../src/shaders/sorting.spv", computePipelineSorting);
         createComputePipeline("../src/shaders/findStartEnd.spv", computePipelineFindStartEnd);
 
         createUniformBuffers();
@@ -361,7 +361,7 @@ private:
     {
         auto computeShaderCode = readFile(computeShaderPath);
         auto computeShaderModule = createShaderModule(computeShaderCode);
-        
+
         vk::PipelineShaderStageCreateInfo computeShaderStageInfo = {};
         computeShaderStageInfo.flags = vk::PipelineShaderStageCreateFlags();
         computeShaderStageInfo.stage = vk::ShaderStageFlagBits::eCompute;
@@ -401,7 +401,7 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 5;
+        poolSizes[0].descriptorCount = 2;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -419,7 +419,7 @@ private:
         }
 
         vk::DescriptorSetAllocateInfo allocInfo = {};
-       // allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        // allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = computeDescriptorPool;
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &computeDescriptorSetLayout;
@@ -432,7 +432,7 @@ private:
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create compute descriptor sets!");
         }
-        
+
         // Set descriptor set for the old vertices
         vk::DescriptorBufferInfo computeBufferInfo1 = {};
         computeBufferInfo1.buffer = vertexBuffer1;
@@ -486,7 +486,7 @@ private:
         computePipelineInfo.layout = computePipelineLayout;
 
         try {
-            pipelineIdx  = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
+            pipelineIdx = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create compute pipeline!");
@@ -560,7 +560,7 @@ private:
 
         cleanupSwapChain();
 
-        device->destroyPipeline(computePipelinePhysics); 
+        device->destroyPipeline(computePipelinePhysics);
         device->destroyPipeline(computePipelineSorting);
         device->destroyPipeline(computePipelineFindStartEnd);
         device->destroyPipelineLayout(computePipelineLayout);
@@ -573,7 +573,7 @@ private:
         device->destroyImageView(textureImageView);
         device->destroyImage(textureImage);
         device->freeMemory(textureImageMemory);
-        
+
         device->destroyBuffer(vertexBuffer1);
         device->freeMemory(vertexBufferMemory1);
         device->destroyBuffer(vertexBuffer2);
@@ -617,8 +617,8 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
-        //createComputePipeline("../src/shaders/computeShader1.spv", computePipeline1);
-        //createComputePipeline("../src/shaders/computeShader2.spv", computePipeline2);
+        //createComputePipeline("../src/shaders/computeShader1.spv", computePipelinePhysics);
+        //createComputePipeline("../src/shaders/computeShader2.spv", computePipelineSorting);
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -810,8 +810,8 @@ private:
         swapChainExtent = extent;
     }
 
-    vk::ImageView createImageView(vk::Image image, vk::Format format, 
-                                  vk::ImageAspectFlags aspectFlags = vk::ImageAspectFlags(vk::ImageAspectFlagBits::eColor)) {
+    vk::ImageView createImageView(vk::Image image, vk::Format format,
+        vk::ImageAspectFlags aspectFlags = vk::ImageAspectFlags(vk::ImageAspectFlagBits::eColor)) {
         vk::ImageViewCreateInfo viewInfo{};
         viewInfo.image = image;
         viewInfo.viewType = vk::ImageViewType::e2D;
@@ -829,7 +829,7 @@ private:
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create texture image view!");
         }
-       
+
         return imageView;
     }
 
@@ -841,7 +841,7 @@ private:
                 swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat);
             }
             catch (vk::SystemError err) {
-                std:: cerr << "failed to create image views!" << std::endl;
+                std::cerr << "failed to create image views!" << std::endl;
             }
         }
     }
@@ -924,7 +924,7 @@ private:
         samplerLayoutBinding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
         samplerLayoutBinding.pImmutableSamplers = nullptr;
         // Indicate that we intend to use the combined image sampler descriptor in the fragment shader.
-        samplerLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eFragment;  
+        samplerLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eFragment;
 
         std::array<vk::DescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
         // Create this->descriptorSetLayout
@@ -1120,7 +1120,7 @@ private:
         vk::ImageMemoryBarrier barrier{};
         barrier.oldLayout = oldLayout;
         barrier.newLayout = newLayout;
-        
+
         // Not want to use the barrier to transfer queue family ownership
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1195,7 +1195,7 @@ private:
             std::cerr << "failed to load texture image!" << std::endl;
         }
         else {
-            std::cout << "load texture image successfully!" << std::endl; 
+            std::cout << "load texture image successfully!" << std::endl;
         }
 
         vk::Buffer stagingBuffer;
@@ -1203,12 +1203,13 @@ private:
 
         try {
             createBuffer(imageSize, vk::BufferUsageFlagBits::eTransferSrc,
-                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-                         stagingBuffer, stagingBufferMemory);
-        } catch (std::runtime_error err) {
+                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                stagingBuffer, stagingBufferMemory);
+        }
+        catch (std::runtime_error err) {
             std::cerr << err.what() << std::endl;
         }
-       
+
         void* data = device->mapMemory(stagingBufferMemory, 0, imageSize);
         memcpy(data, pixels, (size_t)imageSize);
         device->unmapMemory(stagingBufferMemory);
@@ -1219,9 +1220,10 @@ private:
         // Create the texture image
         try {
             createImage(texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
-                        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                        vk::MemoryPropertyFlags(vk::MemoryPropertyFlagBits::eDeviceLocal), textureImage, textureImageMemory);
-        } catch (std::runtime_error err) {
+                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                vk::MemoryPropertyFlags(vk::MemoryPropertyFlagBits::eDeviceLocal), textureImage, textureImageMemory);
+        }
+        catch (std::runtime_error err) {
             std::cerr << err.what() << std::endl;
         }
 
@@ -1233,7 +1235,7 @@ private:
 
         // To be able to start sampling from the texture image in the shader, use one last transition to prepare it for shader access:
         transitionImageLayout(textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-        
+
         device->destroyBuffer(stagingBuffer);
         device->freeMemory(stagingBufferMemory);
     }
@@ -1277,7 +1279,8 @@ private:
         try {
             // The sampler is a distinct object that provides an interface to extract colors from a texture.
             textureSampler = device->createSampler(samplerInfo);
-        } catch (vk::SystemError err) {
+        }
+        catch (vk::SystemError err) {
             throw std::runtime_error("failed to create texture sampler!");
         }
     }
@@ -1352,13 +1355,13 @@ private:
         //std::cout << vertices.size() << std::endl;
     }
 
-    void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, 
-                     vk::MemoryPropertyFlags properties, vk::Image& image, vk::DeviceMemory& imageMemory) {
+    void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
+        vk::MemoryPropertyFlags properties, vk::Image& image, vk::DeviceMemory& imageMemory) {
         // vk::Format texFormat = vk::Format::eR8G8B8A8Srgb;
         vk::ImageCreateInfo imgInfo({}, vk::ImageType::e2D, format,
             { width, height, 1 },
             1, 1, vk::SampleCountFlagBits::e1,
-            tiling, usage, vk::SharingMode::eExclusive, 
+            tiling, usage, vk::SharingMode::eExclusive,
             0, nullptr, vk::ImageLayout::eUndefined
         );
 
@@ -1413,7 +1416,8 @@ private:
                 vk::ImageTiling::eOptimal,
                 vk::FormatFeatureFlags(vk::FormatFeatureFlagBits::eDepthStencilAttachment)
             );
-        } catch (std::runtime_error err) {
+        }
+        catch (std::runtime_error err) {
             std::cerr << err.what() << std::endl;
             depthFormat = vk::Format::eD32Sfloat;
         }
@@ -1428,20 +1432,20 @@ private:
     void createDepthResources() {
         // Find the depth format first
         vk::Format depthFormat = findDepthFormat();
-      ;
+        ;
         vk::ImageCreateInfo depthImgInfo({}, vk::ImageType::e2D, depthFormat,
-                                         { swapChainExtent.width, swapChainExtent.height, 1 },
-                                           1, 1, vk::SampleCountFlagBits::e1,
-                                           vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                                           vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined);
-       
+            { swapChainExtent.width, swapChainExtent.height, 1 },
+            1, 1, vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment,
+            vk::SharingMode::eExclusive, 0, nullptr, vk::ImageLayout::eUndefined);
+
         createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, vk::ImageTiling::eOptimal,
-                    vk::ImageUsageFlags(vk::ImageUsageFlagBits::eDepthStencilAttachment), 
-                    vk::MemoryPropertyFlags(vk::MemoryPropertyFlagBits::eDeviceLocal),
-                    depthImage, depthImageMemory);
+            vk::ImageUsageFlags(vk::ImageUsageFlagBits::eDepthStencilAttachment),
+            vk::MemoryPropertyFlags(vk::MemoryPropertyFlagBits::eDeviceLocal),
+            depthImage, depthImageMemory);
 
         depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlags(vk::ImageAspectFlagBits::eDepth));
-        
+
         // The undefined layout can be used as initial layout
         // transitionImageLayout(depthImage, depthFormat, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
@@ -1459,9 +1463,9 @@ private:
         device->unmapMemory(stagingBufferMemory);
 
         // Create buffer for the old vertices
-        createBuffer(bufferSize, 
-                     vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst | 
-                     vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, 
+        createBuffer(bufferSize,
+            vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer1, vertexBufferMemory1);
 
         // Create buffer for the new vertices
@@ -1511,7 +1515,7 @@ private:
     // Descriptor sets can't be created directly, they must be allocated from a pool like command buffers. 
     // Allocate one of these descriptors for every frame. 
     void createDescriptorPool() {
-        std::array<vk::DescriptorPoolSize, 3> descriptorPoolSizes{};
+        std::array<vk::DescriptorPoolSize, 2> descriptorPoolSizes{};
         descriptorPoolSizes[0].type = vk::DescriptorType::eUniformBuffer;
         descriptorPoolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
         // For the allocation of the combined image sampler
@@ -1570,7 +1574,7 @@ private:
             // Specify how many array elements you want to update.
             descriptorWrites[0].descriptorCount = 1;
             descriptorWrites[0].pBufferInfo = &bufferInfo;
-          
+
             descriptorWrites[1].dstSet = descriptorSets[i];
             descriptorWrites[1].dstBinding = 1;
             descriptorWrites[1].dstArrayElement = 0;
@@ -1623,13 +1627,13 @@ private:
         vk::CommandBufferBeginInfo beginInfo{};
         beginInfo.flags = vk::CommandBufferUsageFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
-        commandBuffer.begin(&beginInfo);     
+        commandBuffer.begin(&beginInfo);
         return commandBuffer;
     }
 
     void endSingleTimeCommands(vk::CommandBuffer& commandBuffer) {
         commandBuffer.end();
-        
+
         vk::SubmitInfo submitInfo{};
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffer;
@@ -1702,8 +1706,8 @@ private:
             renderPassInfo.pClearValues = clearValues.data();
 
             // Bind the compute pipeline
-            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSorting);
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelinePhysics);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1717,7 +1721,7 @@ private:
             computeToComputeBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToComputeBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
-            computeToComputeBarrier.buffer = vertexBuffer1;
+            computeToComputeBarrier.buffer = vertexBuffer2;
             computeToComputeBarrier.offset = 0;
             computeToComputeBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
@@ -1732,8 +1736,8 @@ private:
                 0, nullptr);
 
             // Bind the compute pipeline
-            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSorting);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1742,14 +1746,14 @@ private:
             // Dispatch the compute kernel, with one thread for each vertex
             commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
 
-            vk::BufferMemoryBarrier computeToComputeBarrier2 = {};
-            computeToComputeBarrier2.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
-            computeToComputeBarrier2.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
-            computeToComputeBarrier2.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
-            computeToComputeBarrier2.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
-            computeToComputeBarrier2.buffer = vertexBuffer1;
-            computeToComputeBarrier2.offset = 0;
-            computeToComputeBarrier2.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
+            vk::BufferMemoryBarrier computeToComputeBarrier1 = {};
+            computeToComputeBarrier1.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+            computeToComputeBarrier1.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
+            computeToComputeBarrier1.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier1.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier1.buffer = vertexBuffer2;
+            computeToComputeBarrier1.offset = 0;
+            computeToComputeBarrier1.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
 
             vk::PipelineStageFlags computeShaderStageFlags_3(vk::PipelineStageFlagBits::eComputeShader);
@@ -1758,12 +1762,12 @@ private:
                 computeShaderStageFlags_4,
                 vk::DependencyFlags(),
                 0, nullptr,
-                1, &computeToComputeBarrier2,
+                1, &computeToComputeBarrier1,
                 0, nullptr);
 
             // Bind the compute pipeline
-            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelinePhysics);
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1771,14 +1775,14 @@ private:
 
             // Dispatch the compute kernel, with one thread for each vertex
             commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
-
+            
             // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
             vk::BufferMemoryBarrier computeToVertexBarrier = {};
             computeToVertexBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
             computeToVertexBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToVertexBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-            computeToVertexBarrier.buffer = vertexBuffer1;
+            computeToVertexBarrier.buffer = vertexBuffer2;
             computeToVertexBarrier.offset = 0;
             computeToVertexBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
@@ -1790,7 +1794,7 @@ private:
                 vk::DependencyFlags(),
                 0, nullptr,
                 1, &computeToVertexBarrier,
-                0, nullptr); 
+                0, nullptr);
 
             //vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
             //copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
@@ -1909,7 +1913,7 @@ private:
         }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-        
+
     }
 
     // Generate a new transformation every frame to make the geometry spin around. 
@@ -2016,7 +2020,7 @@ private:
 
         vk::PhysicalDeviceFeatures supportedFeatures;
         device.getFeatures(&supportedFeatures);
-       
+
         return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
     }
 

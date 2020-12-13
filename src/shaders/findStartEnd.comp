@@ -28,7 +28,7 @@ void main() {
     if (index >= PARTICLE_COUNT)
 		return;
 	
-	
+	verticesB[index].position *= 1.0001;
 	//const float a = 0.05 * 3.14159 / 180.0;
 	//verticesB[index].position *= 1.001;
 	//vertices[index].velocity *= 0.9999;
