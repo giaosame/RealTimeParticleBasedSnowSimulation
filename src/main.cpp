@@ -174,8 +174,15 @@ private:
 
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
-    vk::Buffer vertexBuffer;
-    vk::DeviceMemory vertexBufferMemory;
+
+    // Old vertices data
+    vk::Buffer vertexBuffer1;
+    vk::DeviceMemory vertexBufferMemory1;
+
+    // New vertices data
+    vk::Buffer vertexBuffer2;
+    vk::DeviceMemory vertexBufferMemory2;
+
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
     std::vector<vk::Buffer> uniformBuffers;
@@ -332,7 +339,7 @@ private:
         createTextureSampler();
 
         // loadModel();
-        createVertexBuffer();
+        createVertexBuffers();
         createIndexBuffer();
         createComputePipeline();
         
@@ -381,13 +388,13 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 1;
+        poolSizes[0].descriptorCount = 2;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         descriptorPoolInfo.flags = vk::DescriptorPoolCreateFlags();
         descriptorPoolInfo.pNext = nullptr;
-        descriptorPoolInfo.poolSizeCount = 1;
+        descriptorPoolInfo.poolSizeCount = 5;
         descriptorPoolInfo.pPoolSizes = poolSizes.data();
         descriptorPoolInfo.maxSets = 1;
 
@@ -413,26 +420,36 @@ private:
             throw std::runtime_error("failed to create compute descriptor sets!");
         }
         
-        vk::DescriptorBufferInfo computeBufferInfo = {};
-        computeBufferInfo.buffer = vertexBuffer;
-        computeBufferInfo.offset = 0;
-        //computeBufferInfo.range = 3 * sizeof(Vertex);
-        computeBufferInfo.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
-        //computeBufferInfo.range = vertexBufferSize;
+        // Set descriptor set for the old vertices
+        vk::DescriptorBufferInfo computeBufferInfo1 = {};
+        computeBufferInfo1.buffer = vertexBuffer1;
+        computeBufferInfo1.offset = 0;
+        computeBufferInfo1.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
 
-        vk::WriteDescriptorSet writeComputeInfo = {};
-        writeComputeInfo.dstSet = computeDescriptorSet[0];
-        writeComputeInfo.dstBinding = 0;
-        writeComputeInfo.descriptorCount = 1;
-        writeComputeInfo.dstArrayElement = 0;
-        writeComputeInfo.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo.pBufferInfo = &computeBufferInfo;
+        vk::WriteDescriptorSet writeComputeInfo1 = {};
+        writeComputeInfo1.dstSet = computeDescriptorSet[0];
+        writeComputeInfo1.dstBinding = 0;
+        writeComputeInfo1.descriptorCount = 1;
+        writeComputeInfo1.dstArrayElement = 0;
+        writeComputeInfo1.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo1.pBufferInfo = &computeBufferInfo1;
 
-        std::vector<vk::WriteDescriptorSet> writeDescriptorSets = { writeComputeInfo };
+        // Set descriptor set for the new vertices
+        vk::DescriptorBufferInfo computeBufferInfo2 = {};
+        computeBufferInfo2.buffer = vertexBuffer2;
+        computeBufferInfo2.offset = 0;
+        computeBufferInfo2.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
 
-        //device->updateDescriptorSets(static_cast<uint32_t>(writeComputeInfo.size()), writeComputeInfo.data(), 0, nullptr);
+        vk::WriteDescriptorSet writeComputeInfo2 = {};
+        writeComputeInfo2.dstSet = computeDescriptorSet[0];
+        writeComputeInfo2.dstBinding = 0;
+        writeComputeInfo2.descriptorCount = 1;
+        writeComputeInfo2.dstArrayElement = 0;
+        writeComputeInfo2.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo2.pBufferInfo = &computeBufferInfo2;
 
-        device->updateDescriptorSets(1, writeDescriptorSets.data(), 0, nullptr);
+        std::array<vk::WriteDescriptorSet, 2> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2 };
+        device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
         vk::PipelineLayoutCreateInfo computePipelineLayoutInfo = {};
@@ -457,7 +474,6 @@ private:
 
         try {
             computePipeline = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
-
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create compute pipeline!");
@@ -543,8 +559,10 @@ private:
         device->destroyImage(textureImage);
         device->freeMemory(textureImageMemory);
         
-        device->destroyBuffer(vertexBuffer);
-        device->freeMemory(vertexBufferMemory);
+        device->destroyBuffer(vertexBuffer1);
+        device->freeMemory(vertexBufferMemory1);
+        device->destroyBuffer(vertexBuffer2);
+        device->freeMemory(vertexBufferMemory2);
 
         device->destroyBuffer(indexBuffer);
         device->freeMemory(indexBufferMemory);
@@ -1412,7 +1430,7 @@ private:
         // transitionImageLayout(depthImage, depthFormat, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
 
-    void createVertexBuffer() {
+    void createVertexBuffers() {
         vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
         // vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -1424,12 +1442,20 @@ private:
         memcpy(data, raw_verts, (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
+        // Create buffer for the old vertices
         createBuffer(bufferSize, 
                      vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst | 
                      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, 
-            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer1, vertexBufferMemory1);
 
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+        // Create buffer for the new vertices
+        createBuffer(bufferSize,
+            vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer2, vertexBufferMemory2);
+
+        copyBuffer(stagingBuffer, vertexBuffer1, bufferSize);
+        copyBuffer(stagingBuffer, vertexBuffer2, bufferSize);
 
         device->destroyBuffer(stagingBuffer);
         device->freeMemory(stagingBufferMemory);
@@ -1469,12 +1495,15 @@ private:
     // Descriptor sets can't be created directly, they must be allocated from a pool like command buffers. 
     // Allocate one of these descriptors for every frame. 
     void createDescriptorPool() {
-        std::array<vk::DescriptorPoolSize, 2> descriptorPoolSizes{};
+        std::array<vk::DescriptorPoolSize, 3> descriptorPoolSizes{};
         descriptorPoolSizes[0].type = vk::DescriptorType::eUniformBuffer;
         descriptorPoolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
         // For the allocation of the combined image sampler
         descriptorPoolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
         descriptorPoolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+
+        descriptorPoolSizes[2].type = vk::DescriptorType::eStorageBuffer;
+        descriptorPoolSizes[2].descriptorCount = static_cast<uint32_t>(5);
 
         vk::DescriptorPoolCreateInfo poolInfo{};
         poolInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
@@ -1677,7 +1706,7 @@ private:
             computeToVertexBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToVertexBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-            computeToVertexBarrier.buffer = vertexBuffer;
+            computeToVertexBarrier.buffer = vertexBuffer1;
             computeToVertexBarrier.offset = 0;
             computeToVertexBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
@@ -1701,7 +1730,7 @@ private:
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
-            vk::Buffer vertexBuffers[] = { vertexBuffer };
+            vk::Buffer vertexBuffers[] = { vertexBuffer2 };
             vk::DeviceSize offsets[] = { 0 };
             commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
             commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
@@ -1827,9 +1856,9 @@ private:
     }
 
     void updateVertexBuffer(uint32_t currentImage) {
-        void* data = device->mapMemory(vertexBufferMemory, 0, sizeof(raw_verts[0]) * N_FOR_VIS);
+        void* data = device->mapMemory(vertexBufferMemory1, 0, sizeof(raw_verts[0]) * N_FOR_VIS);
         memcpy(data, raw_verts, sizeof(raw_verts[0]) * N_FOR_VIS);
-        device->unmapMemory(vertexBufferMemory);
+        device->unmapMemory(vertexBufferMemory1);
     }
 
     vk::UniqueShaderModule createShaderModule(const std::vector<char>& code) {
