@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define PI 3.1415926f
-#define PARTICLE_COUNT 27000
+// #define PARTICLE_COUNT 14112
 
 struct Vertex {
     vec4 position;
@@ -27,8 +27,13 @@ layout(set = 0, binding = 3) buffer CellVertCount {
 	int cellVertCount[];   
 };
 
+layout(set = 0, binding = 4) buffer UniformNumVerts {
+	int num_vertices;   
+};
+
 // Compute cohesive forces, compressive forces, update radius, move particles
 void main() {
+	const int PARTICLE_COUNT = num_vertices;
 	uint index = gl_GlobalInvocationID.x;
 	// Don't try to write beyond particle count
     if (index >= PARTICLE_COUNT)
@@ -58,7 +63,7 @@ void main() {
 	const float damping = 0.95f;
 	const float boundry_damping = 0.5f;
 
-	const vec3 gravity = vec3(0.f, -9.82f, 0.f);
+	const vec3 gravity = vec3(0.f, -1.82f, 0.f);
 
 	const float Kf = 50.f;
 	const float angle_of_repose = 38.f / 180.f * PI;

@@ -173,6 +173,9 @@ private:
     vk::Buffer vertexBuffer2;
     vk::DeviceMemory vertexBufferMemory2;
 
+    vk::Buffer numVertsBuffer;
+    vk::DeviceMemory numVertsBufferMemory;
+
     // storge buffer 
     vk::Buffer cellVertArrayBuffer;
     vk::DeviceMemory cellVertArrayBufferMemory;
@@ -181,8 +184,9 @@ private:
 
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
-    std::vector<vk::Buffer> uniformBuffers;
-    std::vector<vk::DeviceMemory> uniformBuffersMemory;
+
+    std::vector<vk::Buffer> uniformUboBuffers;
+    std::vector<vk::DeviceMemory> uniformUboBuffersMemory;
 
     vk::DescriptorPool descriptorPool;
     std::vector<vk::DescriptorSet> descriptorSets;
@@ -286,7 +290,10 @@ private:
     void initParticles() {
         // cube 
         // float l = 0.98f * (float)n / 10.f;
-        PointsGenerator::createCube(raw_verts, raw_indices, N_SIDE);
+        const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
+        PointsGenerator::createCube(raw_verts, raw_indices, N_SIDE, OFFSET);
+        
+        //PointsGenerator::createSphere(raw_verts, raw_indices, N_SIDE, OFFSET);
     }
 
     void initVulkan() {
@@ -309,6 +316,7 @@ private:
         // loadModel();
         createVertexBuffers();
         createIndexBuffer();
+        createNumVertsBuffer();
 
         createCellVertArrayBuffer();
         createCellVertCountBuffer();
@@ -317,7 +325,7 @@ private:
         createComputePipeline("../src/shaders/fillCellVertexInfo.spv", computePipelineFillCellVertex);
         createComputePipeline("../src/shaders/resetCellVertexInfo.spv", computePipelineResetCellVertex); 
 
-        createUniformBuffers();
+        createuniformUboBuffers();
         createDescriptorPool();
         createDescriptorSets();
         createCommandBuffers();
@@ -363,7 +371,15 @@ private:
         computeLayoutBindingCellVertexCount.pImmutableSamplers = nullptr;
         computeLayoutBindingCellVertexCount.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBindingVertices1, computeLayoutBindingVertices2, computeLayoutBindingCellVertexArray, computeLayoutBindingCellVertexCount };
+        vk::DescriptorSetLayoutBinding computeLayoutBindingNumVerts{};
+        computeLayoutBindingNumVerts.binding = 4;
+        computeLayoutBindingNumVerts.descriptorCount = 1;
+        computeLayoutBindingNumVerts.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingNumVerts.pImmutableSamplers = nullptr;
+        computeLayoutBindingNumVerts.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBindingVertices1, computeLayoutBindingVertices2,
+            computeLayoutBindingCellVertexArray, computeLayoutBindingCellVertexCount, computeLayoutBindingNumVerts };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -404,7 +420,6 @@ private:
         allocInfo.descriptorPool = computeDescriptorPool;
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &computeDescriptorSetLayout;
-
 
         //computeDescriptorSet.resize(1);
         try {
@@ -470,7 +485,22 @@ private:
         writeComputeInfoCellVertexCount.descriptorType = vk::DescriptorType::eStorageBuffer;
         writeComputeInfoCellVertexCount.pBufferInfo = &computeBufferInfoCellVertexCount;
 
-        std::array<vk::WriteDescriptorSet, 4> writeDescriptorSets = { writeComputeInfoVertices1, writeComputeInfoVertices2, writeComputeInfoCellVertexArray, writeComputeInfoCellVertexCount };
+        // Set descriptor set for the buffer representing the number of vertices
+        vk::DescriptorBufferInfo computeBufferInfoNumVerts = {};
+        computeBufferInfoNumVerts.buffer = numVertsBuffer;
+        computeBufferInfoNumVerts.offset = 0;
+        computeBufferInfoNumVerts.range = static_cast<uint32_t>(sizeof(int));
+
+        vk::WriteDescriptorSet writeComputeInfoNumVerts = {};
+        writeComputeInfoNumVerts.dstSet = computeDescriptorSet[0];
+        writeComputeInfoNumVerts.dstBinding = 4;
+        writeComputeInfoNumVerts.descriptorCount = 1;
+        writeComputeInfoNumVerts.dstArrayElement = 0;
+        writeComputeInfoNumVerts.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoNumVerts.pBufferInfo = &computeBufferInfoNumVerts;
+
+        std::array<vk::WriteDescriptorSet, 5> writeDescriptorSets = { writeComputeInfoVertices1, writeComputeInfoVertices2, 
+            writeComputeInfoCellVertexArray, writeComputeInfoCellVertexCount, writeComputeInfoNumVerts };
         device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
@@ -545,8 +575,8 @@ private:
         }
 
         for (size_t i = 0; i < swapChainImages.size(); i++) {
-            device->destroyBuffer(uniformBuffers[i]);
-            device->freeMemory(uniformBuffersMemory[i]);
+            device->destroyBuffer(uniformUboBuffers[i]);
+            device->freeMemory(uniformUboBuffersMemory[i]);
         }
 
         device->destroyDescriptorPool(descriptorPool);
@@ -568,6 +598,9 @@ private:
         device->destroyImageView(textureImageView);
         device->destroyImage(textureImage);
         device->freeMemory(textureImageMemory);
+
+        device->destroyBuffer(numVertsBuffer);
+        device->freeMemory(numVertsBufferMemory);
 
         device->destroyBuffer(vertexBuffer1);
         device->freeMemory(vertexBufferMemory1);
@@ -619,7 +652,7 @@ private:
         createGraphicsPipeline();
         createDepthResources();
         createFramebuffers();
-        createUniformBuffers();
+        createuniformUboBuffers();
         createDescriptorPool();
         createDescriptorSets();
         createCommandBuffers();
@@ -1478,6 +1511,30 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
+    void createNumVertsBuffer() {
+        vk::DeviceSize bufferSize = static_cast<uint32_t>(sizeof(int));
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        const int NUM_VERTS = raw_verts.size();
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, &NUM_VERTS, (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        // Create buffer for the old vertices
+        createBuffer(bufferSize,
+            vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eDeviceLocal, numVertsBuffer, numVertsBufferMemory);
+
+        copyBuffer(stagingBuffer, numVertsBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
     void createCellVertArrayBuffer() {
         vk::DeviceSize bufferSize = sizeof(int) * N_GRID_CELLS * 6;
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
@@ -1520,14 +1577,14 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
-    void createUniformBuffers() {
+    void createuniformUboBuffers() {
         vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 
-        uniformBuffers.resize(swapChainImages.size());
-        uniformBuffersMemory.resize(swapChainImages.size());
+        uniformUboBuffers.resize(swapChainImages.size());
+        uniformUboBuffersMemory.resize(swapChainImages.size());
 
         for (size_t i = 0; i < swapChainImages.size(); i++) {
-            createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformBuffers[i], uniformBuffersMemory[i]);
+            createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformUboBuffers[i], uniformUboBuffersMemory[i]);
         }
     }
 
@@ -1573,7 +1630,7 @@ private:
 
         for (size_t i = 0; i < swapChainImages.size(); i++) {
             vk::DescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.buffer = uniformUboBuffers[i];
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
@@ -1763,7 +1820,7 @@ private:
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
 
             // Dispatch the compute kernel, with one thread for each vertex
-            commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
+            commandBuffers[i].dispatch(uint32_t(raw_verts.size()), 1, 1);
 
             vk::BufferMemoryBarrier computeToComputeBarrier1 = {};
             computeToComputeBarrier1.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
@@ -1793,7 +1850,7 @@ private:
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
 
             // Dispatch the compute kernel, with one thread for each vertex
-            commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
+            commandBuffers[i].dispatch(uint32_t(raw_verts.size()), 1, 1);
             
             // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
             vk::BufferMemoryBarrier computeToVertexBarrier = {};
@@ -1803,7 +1860,7 @@ private:
             computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
             computeToVertexBarrier.buffer = vertexBuffer2;
             computeToVertexBarrier.offset = 0;
-            computeToVertexBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
+            computeToVertexBarrier.size = uint32_t(raw_verts.size()) * sizeof(Vertex);  //vertexBufferSize
 
 
             vk::PipelineStageFlags computeShaderStageFlags(vk::PipelineStageFlagBits::eComputeShader);
@@ -1824,7 +1881,7 @@ private:
             commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
 
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-            commandBuffers[i].drawIndexed(static_cast<uint32_t>(N_FOR_VIS), 1, 0, 0, 0);
+            commandBuffers[i].drawIndexed(static_cast<uint32_t>(uint32_t(raw_indices.size())), 1, 0, 0, 0);
 
             commandBuffers[i].endRenderPass();
 
@@ -1943,15 +2000,15 @@ private:
         ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.01f, 30.0f);
         ubo.proj[1][1] *= -1;
 
-        void* data = device->mapMemory(uniformBuffersMemory[currentImage], 0, sizeof(ubo));
+        void* data = device->mapMemory(uniformUboBuffersMemory[currentImage], 0, sizeof(ubo));
         memcpy(data, &ubo, sizeof(ubo));
-        device->unmapMemory(uniformBuffersMemory[currentImage]);
+        device->unmapMemory(uniformUboBuffersMemory[currentImage]);
     }
 
     void updateVertexBuffer(uint32_t currentImage) {
-        void* data = device->mapMemory(vertexBufferMemory1, 0, static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex)));
-        memcpy(data, raw_verts.data(), sizeof(raw_verts[0]) * N_FOR_VIS);
-        device->unmapMemory(vertexBufferMemory1);
+       /* void* data = device->mapMemory(vertexBufferMemory1, 0, static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex)));
+        memcpy(data, raw_verts.data(), sizeof(raw_verts[0]) * uint32_t(raw_verts.size()));
+        device->unmapMemory(vertexBufferMemory1);*/
     }
 
     vk::UniqueShaderModule createShaderModule(const std::vector<char>& code) {

@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define PARTICLE_COUNT 27000
+// #define PARTICLE_COUNT 14112
 
 struct Vertex {
     vec4 position;
@@ -22,12 +22,18 @@ layout(set = 0, binding = 3) buffer CellVertCount {
 	int cellVertCount[];   
 };
 
+layout(set = 0, binding = 4) buffer NumVertsBuffer {
+	int num_vertices;   
+};
+
 // Find the cell id of particles and fill the cellVertArray buffer with particle ids
 void main() {
+	const int PARTICLE_COUNT = num_vertices;
 	uint index = gl_GlobalInvocationID.x;
     if (index >= PARTICLE_COUNT)
 		return;
-
+	
+	int temp = num_vertices;
 	// identity the cell id of each particle
 	const float gridSize = 0.1f;
 	const float width = 5.f;   // Y
