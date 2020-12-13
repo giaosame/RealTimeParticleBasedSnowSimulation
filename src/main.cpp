@@ -21,7 +21,6 @@
 #include <optional>
 #include <set>
 
-#include "kernel.h"
 #include "vertex.h"
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
@@ -45,11 +44,11 @@ bool rightMouseDown = false;
 double previousX = 0.0;
 double previousY = 0.0;
 
-float r = 8.0f;
+float r = 10.0f;
 float theta = 1.0f;
 float phi = -0.7f;
 
-glm::vec3 eye = glm::vec3(0.0f, 0.0f, 10.0f);
+glm::vec3 eye = glm::vec3(5.0f, 5.0f, r);
 glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 const std::vector<const char*> validationLayers = {
@@ -157,9 +156,6 @@ private:
     Vertex* raw_verts = new Vertex[N_FOR_VIS];
     uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
 
-    glm::ivec2* sortIds = new glm::ivec2[N_FOR_VIS];
-    glm::ivec2* startEndIds = new glm::ivec2[N_GRID_CELLS];
-
     int* cellVertArray = new int[N_GRID_CELLS * 6]{ 0 };
     int* cellVertCount = new int[N_GRID_CELLS]{ 0 };
 
@@ -261,6 +257,7 @@ private:
 
         glfwSetMouseButtonCallback(window, mouseDownCallback);
         glfwSetCursorPosCallback(window, mouseMoveCallback);
+        updateOrbit(0.0f, 0.0f, 0.0f);
     }
 
     static void updateOrbit(float deltaX, float deltaY, float deltaZ) {
@@ -278,21 +275,14 @@ private:
         eye = glm::vec3(-viewMat[3][0], -viewMat[3][1], -viewMat[3][2]);
     }
 
-
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
         auto app = reinterpret_cast<MyVulkanRenderer*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
     }
 
     void initParticles() {
-        // Initialize N-body simulation
-        Boids::initSimulation(N_FOR_VIS);
-
         // cube 
-
         int numParticles = N_SIDE * N_SIDE * N_SIDE;
-        std::vector<Particle> particles;
-        particles.reserve(numParticles);
         // float l = 0.98f * (float)n / 10.f;
         float l = (float)N_SIDE / 10.f;
 
@@ -303,24 +293,18 @@ private:
             {
                 for (int k = 0; k < N_SIDE; ++k)
                 {
-                    Particle p = Particle();
-                    p.position = glm::vec3(k * l / (float)N_SIDE,
+                    glm::vec3 position;
+                    position = glm::vec3(k * l / (float)N_SIDE,
                         j * l / (float)N_SIDE,
                         i * l / (float)N_SIDE);
-                    p.position += glm::vec3(0.05f, 0.05f, 0.05f);
-                    //p.velocity = glm::vec3(1.f, 1.f, 1.f);
-                    particles.push_back(p);
-
-                    raw_verts[idx].position = glm::vec4(p.position, 1.f);
-                    raw_indices[idx] = idx;
+                    position += glm::vec3(0.05f, 0.05f, 0.05f);
                    
-                    sortIds[idx] = glm::ivec2(0, idx); // cell_id, vertex_idx
+                    raw_verts[idx].position = glm::vec4(position, 1.f);
+                    raw_indices[idx] = idx; 
                     idx++;
                 }
             }
         }
-        std::cout << "idx: " << idx << std::endl;
-        Boids::copyParticlesToDevice(particles);
     }
 
     void initVulkan() {
@@ -553,19 +537,10 @@ private:
         std::cout << sizeof(glm::vec3) << ", " << sizeof(glm::vec4) << ", " << sizeof(Vertex) << std::endl;
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
-            // runCUDA();
             drawFrame();
         }
 
         device->waitIdle();
-    }
-
-    void runCUDA() {
-        // Map OpenGL buffer object for writing from CUDA on a single GPU
-        // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
-        // use this buffer
-        Boids::advanceOneStep(DT);
-        Boids::copyParticlesToHost(raw_verts, N_FOR_VIS);
     }
 
     void cleanupSwapChain() {
