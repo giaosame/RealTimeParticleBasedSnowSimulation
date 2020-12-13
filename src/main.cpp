@@ -105,23 +105,6 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 proj;
 };
 
-//const std::vector<Vertex> vertices = {
-//    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-//    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-//    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-//    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-//
-//    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-//    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-//    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-//    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-//};
-//
-//const std::vector<uint16_t> indices = {
-//    0, 1, 2, 2, 3, 0,
-//    4, 5, 6, 6, 7, 4
-//};
-
 class MyVulkanRenderer {
 public:
     void run() {
@@ -177,7 +160,6 @@ private:
     glm::ivec2* sortIds = new glm::ivec2[N_FOR_VIS];
     glm::ivec2* startEndIds = new glm::ivec2[N_GRID_CELLS];
 
-    // lala
     int* cellVertArray = new int[N_GRID_CELLS * 6]{ 0 };
     int* cellVertCount = new int[N_GRID_CELLS]{ 0 };
 
@@ -201,7 +183,6 @@ private:
     vk::DeviceMemory startEndIdBufferMemory;
 
     // storge buffer 
-    // lala
     vk::Buffer cellVertArrayBuffer;
     vk::DeviceMemory cellVertArrayBufferMemory;
     vk::Buffer cellVertCountBuffer;
@@ -224,8 +205,8 @@ private:
     // for compute pipeline
     vk::PipelineLayout computePipelineLayout;
     vk::Pipeline computePipelinePhysics;
-    vk::Pipeline computePipelineSorting;
-    vk::Pipeline computePipelineFindStartEnd;
+    vk::Pipeline computePipelineFillCellVertex;
+    vk::Pipeline computePipelineResetCellVertex;
     vk::DescriptorSetLayout computeDescriptorSetLayout;
     vk::DescriptorPool computeDescriptorPool;
     std::vector<vk::DescriptorSet> computeDescriptorSet;
@@ -374,13 +355,12 @@ private:
         createSortIdBuffer();
         createStartEndIdBuffer();
 
-        // lala
         createCellVertArrayBuffer();
         createCellVertCountBuffer();
 
         createComputePipeline("../src/shaders/physicsCompute.spv", computePipelinePhysics);
-        createComputePipeline("../src/shaders/sorting.spv", computePipelineSorting);
-        createComputePipeline("../src/shaders/findStartEnd.spv", computePipelineFindStartEnd);
+        createComputePipeline("../src/shaders/fillCellVertexInfo.spv", computePipelineFillCellVertex);
+        createComputePipeline("../src/shaders/resetCellVertexInfo.spv", computePipelineResetCellVertex); 
 
         createUniformBuffers();
         createDescriptorPool();
@@ -677,8 +657,8 @@ private:
         cleanupSwapChain();
 
         device->destroyPipeline(computePipelinePhysics);
-        device->destroyPipeline(computePipelineSorting);
-        device->destroyPipeline(computePipelineFindStartEnd);
+        device->destroyPipeline(computePipelineFillCellVertex);
+        device->destroyPipeline(computePipelineResetCellVertex);
         device->destroyPipelineLayout(computePipelineLayout);
         device->destroyDescriptorPool(computeDescriptorPool);
         device->destroyDescriptorSetLayout(computeDescriptorSetLayout);
@@ -744,7 +724,7 @@ private:
         createRenderPass();
         createGraphicsPipeline();
         //createComputePipeline("../src/shaders/computeShader1.spv", computePipelinePhysics);
-        //createComputePipeline("../src/shaders/computeShader2.spv", computePipelineSorting);
+        //createComputePipeline("../src/shaders/computeShader2.spv", computePipelineFillCellVertex);
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -1917,7 +1897,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSorting);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineResetCellVertex);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1947,7 +1927,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFillCellVertex);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
