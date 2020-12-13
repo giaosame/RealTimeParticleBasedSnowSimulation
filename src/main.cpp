@@ -361,15 +361,21 @@ private:
         computeShaderStageInfo.module = *computeShaderModule;
         computeShaderStageInfo.pName = "main";
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding{};
-        computeLayoutBinding.binding = 0;
-        computeLayoutBinding.descriptorCount = 1;
-        computeLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding.pImmutableSamplers = nullptr;
-        // Indicate that we intend to use the combined image sampler descriptor in the fragment shader.
-        computeLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        vk::DescriptorSetLayoutBinding computeLayoutBinding1{};
+        computeLayoutBinding1.binding = 0;
+        computeLayoutBinding1.descriptorCount = 1;
+        computeLayoutBinding1.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding1.pImmutableSamplers = nullptr;
+        computeLayoutBinding1.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding };
+        vk::DescriptorSetLayoutBinding computeLayoutBinding2{};
+        computeLayoutBinding2.binding = 1;
+        computeLayoutBinding2.descriptorCount = 1;
+        computeLayoutBinding2.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding2.pImmutableSamplers = nullptr;
+        computeLayoutBinding2.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2 };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -394,7 +400,7 @@ private:
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         descriptorPoolInfo.flags = vk::DescriptorPoolCreateFlags();
         descriptorPoolInfo.pNext = nullptr;
-        descriptorPoolInfo.poolSizeCount = 5;
+        descriptorPoolInfo.poolSizeCount = 1;
         descriptorPoolInfo.pPoolSizes = poolSizes.data();
         descriptorPoolInfo.maxSets = 1;
 
@@ -442,7 +448,7 @@ private:
 
         vk::WriteDescriptorSet writeComputeInfo2 = {};
         writeComputeInfo2.dstSet = computeDescriptorSet[0];
-        writeComputeInfo2.dstBinding = 0;
+        writeComputeInfo2.dstBinding = 1;
         writeComputeInfo2.descriptorCount = 1;
         writeComputeInfo2.dstArrayElement = 0;
         writeComputeInfo2.descriptorType = vk::DescriptorType::eStorageBuffer;
@@ -1501,9 +1507,6 @@ private:
         // For the allocation of the combined image sampler
         descriptorPoolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
         descriptorPoolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
-
-        descriptorPoolSizes[2].type = vk::DescriptorType::eStorageBuffer;
-        descriptorPoolSizes[2].descriptorCount = static_cast<uint32_t>(5);
 
         vk::DescriptorPoolCreateInfo poolInfo{};
         poolInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
