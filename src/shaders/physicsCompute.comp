@@ -1,0 +1,299 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+#define WORKGROUP_SIZE 64
+#define PI 3.1415926f
+#define PARTICLE_COUNT 1000
+
+//layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+struct Vertex {
+    vec4 position;
+	vec4 velocity;
+	vec4 attr1;  // radius, mass, isFixed, snowPortion
+	vec4 attr2;  // neighborMax, hasBrokenBond, d, (null)
+};
+
+layout(set = 0, binding = 0) buffer VerticesA {
+	Vertex verticesA[];
+};
+
+layout(set = 0, binding = 1) buffer VerticesB {
+	Vertex verticesB[];
+};
+
+void main() {
+	uint index = gl_GlobalInvocationID.x;
+	// Don't try to write beyond particle count
+    if (index >= PARTICLE_COUNT)
+		return;
+	
+	// boundry of the space
+	float width = 5.f;   // Y
+	float length = 5.f;  // X
+	float height = 5.f;  // Z
+	vec4 startPoint = vec4(0.f, 0.f, 0.f, 0.f);
+
+	float radius_snow = 0.05f;
+	float radius_ice = 0.025f;
+	float gridSize = 2.f * radius_snow;
+
+	float neighborRadius = 1.5f * gridSize;
+
+	float youngs_modulus_snow = 25000.f;
+	float youngs_modulus_ice = 35000.f;
+	float cohesive_strength_snow = 625.f;   //625
+	float cohesive_strength_ice = 3750.f;   // 3750
+
+	float Kq = 0.00005f;
+	float FminW = 0.12275f;
+	float FmaxW = 10000.f;
+
+	float damping = 0.98f;
+	float boundry_damping = 0.5f;
+
+	vec3 gravity = vec3(0.f, -9.82f, 0.f);
+
+	float Kf = 50.f;
+	float angle_of_repose = 38.f / 180.f * PI;
+	float dt = 0.0017f;
+
+	Vertex p = verticesA[index];
+	vec3 pos = p.position.xyz;
+
+	// find neighbors
+	vec3 pos_temp;
+	int neighborCount = 0;
+	int neighborIdx[50];
+	for(int i = 0; i < 50; ++i)
+		neighborIdx[i] = -1;
+
+	for(int i = 0; i < PARTICLE_COUNT; ++i)
+	{	
+		if(i == index) 
+			continue;
+		pos_temp = verticesA[i].position.xyz;
+
+		if(distance(pos_temp, pos) < neighborRadius)
+		{
+			neighborIdx[neighborCount] = i;
+			neighborCount++;
+		}
+	}
+
+	float temp1 = neighborCount / verticesA[index].attr2.x;
+	if(temp1 < 0.75f && temp1 > 0.f)
+	{
+		verticesB[index].attr2.y = 1.f;
+	}
+	else
+	{
+		float neighborMaxCur = verticesA[index].attr2.x;
+		verticesB[index].attr2.x = neighborCount > neighborMaxCur ? neighborCount : neighborMaxCur;
+	}
+
+	vec3 cohesiveForces = vec3(0.f, 0.f, 0.f);
+	vec3 positiveForces = vec3(0.f, 0.f, 0.f);
+	vec3 negitiveForces = vec3(0.f, 0.f, 0.f);
+	float compressiveForces = 0.f;
+	
+	// evaluate cohesive forces
+	for(int i = 0; i < neighborCount; ++i)
+	{
+		int neighborIndex = neighborIdx[i];
+		Vertex pNeighbor = verticesA[neighborIndex];
+		float dist = distance(p.position, pNeighbor.position);
+
+		if(pNeighbor.attr2.y == -1 && p.attr2.y == -1 && dist > (p.attr1.x + pNeighbor.attr1.x))
+		{
+			vec3 dir = normalize(p.position.xyz - pNeighbor.position.xyz);
+			float overlapDist = p.attr1.x + pNeighbor.attr1.x - dist;
+
+			float Ei = youngs_modulus_snow * p.attr1.w + youngs_modulus_ice * (1 - p.attr1.w);
+			float Ej = youngs_modulus_snow * pNeighbor.attr1.w + youngs_modulus_ice * (1 - pNeighbor.attr1.w);
+
+			vec3 forces = (Ei * p.attr1.x + Ej * pNeighbor.attr1.x) / 2.f * overlapDist * dir;
+
+			float cohesive_strength_i = cohesive_strength_snow * p.attr1.w + cohesive_strength_ice * (1 - p.attr1.w);
+			float cohesive_strength_j = cohesive_strength_snow * pNeighbor.attr1.w + cohesive_strength_ice * (1 - pNeighbor.attr1.w);
+
+			float condition1 = -1.f * (Ei * p.attr1.x + Ej * pNeighbor.attr1.x) / 2.f * overlapDist;
+			float condition2 = 4.f * (cohesive_strength_i * p.attr1.x * p.attr1.x + cohesive_strength_j * pNeighbor.attr1.x * pNeighbor.attr1.x) / 2.f;
+
+			if (condition1 < condition2)
+				cohesiveForces += forces;
+			else
+				cohesiveForces += vec3(0.f);
+		}
+		else if (dist < (p.attr1.x + pNeighbor.attr1.x))
+		{
+			vec3 dir = normalize(p.position.xyz - pNeighbor.position.xyz);
+			float overlapDist = p.attr1.x + pNeighbor.attr1.x - dist;
+
+			float Ei = youngs_modulus_snow * p.attr1.w + youngs_modulus_ice * (1 - p.attr1.w);
+			float Ej = youngs_modulus_snow * pNeighbor.attr1.w + youngs_modulus_ice * (1 - pNeighbor.attr1.w);
+
+			vec3 forces = (Ei * p.attr1.x + Ej * pNeighbor.attr1.x) / 2.f * overlapDist * dir;
+
+			float cohesive_strength_i = cohesive_strength_snow * p.attr1.w + cohesive_strength_ice * (1 - p.attr1.w);
+			float cohesive_strength_j = cohesive_strength_snow * pNeighbor.attr1.w + cohesive_strength_ice * (1 - pNeighbor.attr1.w);
+
+			float condition1 = -1.f * (Ei * p.attr1.x + Ej * pNeighbor.attr1.x) / 2.f * overlapDist;
+			float condition2 = 4.f * (cohesive_strength_i * p.attr1.x * p.attr1.x + cohesive_strength_j * pNeighbor.attr1.x * pNeighbor.attr1.x) / 2.f;
+
+			if (condition1 < condition2)
+				cohesiveForces += forces;
+			else
+				cohesiveForces += vec3(0.f);
+
+			// update compressive forces
+			if (forces.x > 0)
+				positiveForces.x += forces.x;
+			else
+				negitiveForces.x += forces.x;
+
+			if (forces.y > 0)
+				positiveForces.y += forces.y;
+			else
+				negitiveForces.y += forces.y;
+
+			if (forces.z > 0)
+				positiveForces.z += forces.z;
+			else
+				negitiveForces.z += forces.z;
+				
+		
+			// evaluate tensile contact force
+			vec3 vi = p.velocity.xyz;
+			vec3 vj = pNeighbor.velocity.xyz;
+			if (vi != vj)
+			{
+				vec3 ut = -1.f * normalize(vi - vj);
+
+				float tanCoeff = tan(angle_of_repose);   // considering
+
+				vec3 Ft = ut * distance(forces, vec3(0.f)) * tanCoeff * 1.5f;    // length?
+				//vec3 Ft = ut * length(forces) * tanCoeff * 1.f;
+				cohesiveForces += Ft;
+			}
+			
+			
+		}
+
+	}
+
+	
+	// evaluate compression
+	float minXSquare = min(positiveForces.x * positiveForces.x, negitiveForces.x * negitiveForces.x);
+	float minYSquare = min(positiveForces.y * positiveForces.y, negitiveForces.y * negitiveForces.y);
+	float minZSquare = min(positiveForces.z * positiveForces.z, negitiveForces.z * negitiveForces.z);
+
+	compressiveForces = sqrt(minXSquare + minYSquare + minZSquare);
+
+	float p_temp = compressiveForces / (PI * p.attr1.x * p.attr1.x);
+
+	float pi = 100.f * p.attr1.w + 900.f * (1 - p.attr1.w);
+	float e = 2.71828183f;
+	float Dpi = FminW + FmaxW * ((pow(e, (pi / 100.f - 1)) - 0.000335f) / 2980.96f);
+
+	if (compressiveForces > Dpi)
+	{
+		verticesB[index].attr2.z -= Kq * p_temp;
+		verticesB[index].attr1.x = verticesB[index].attr2.z * radius_snow + (1 - verticesB[index].attr2.z) * radius_ice;
+		verticesB[index].attr1.w = verticesB[index].attr2.z;
+	}
+
+	// move particles
+	if(p.attr1.z == 1)
+		verticesB[index].velocity.xyz = vec3(0.f);
+	else
+	{
+		vec3 vNew = p.velocity.xyz + (cohesiveForces / p.attr1.y  + gravity) * dt;   // p.attr1.y
+		vec3 xNew = p.position.xyz + vNew * dt;
+
+		// hit the ground
+		if (xNew.y < p.attr1.x)  // || xNew.y > length - p.attr1.x
+		{
+			// moving the particle to the surface of the wall
+			if (xNew.y < p.attr1.x)
+			{
+				xNew.y = p.attr1.x;
+				positiveForces.y = -1.f * negitiveForces.y;
+			}
+			else
+			{
+				xNew.y = length - p.attr1.x;
+				negitiveForces.y = -1.f * positiveForces.y;
+			}
+
+			// change the velocity
+			vec3 vn = vec3(0.f);
+			vec3 vt = vNew;
+			vn.y = -1.f * vNew.y;
+			vt.y = 0.f;
+
+			vNew = vn + vt * max(0.f, 1.f - Kf * (distance(vn, vec3(0.f)) / distance(vt, vec3(0.f))));
+			vNew *= boundry_damping;
+		}
+		
+		if (xNew.x < p.attr1.x || xNew.x > length - p.attr1.x)
+		{
+			// moving the particle to the surface of the wall
+			if (xNew.x < p.attr1.x)
+			{
+				xNew.x = p.attr1.x;
+				positiveForces.x = -1.f * negitiveForces.x;
+			}
+			else
+			{
+				xNew.x = length - p.attr1.x;
+				negitiveForces.x = -1.f * positiveForces.x;
+			}
+
+			// change the velocity
+			vec3 vn = vec3(0.f);
+			vec3 vt = vNew;
+			vn.x = -1.f * vNew.x;
+			vt.x = 0.f;
+
+			vNew = vn + vt * max(0.f, 1.f - Kf * (distance(vn, vec3(0.f)) / distance(vt, vec3(0.f))));
+			vNew *= boundry_damping;
+		}
+
+		if (xNew.z < p.attr1.x || xNew.z > length - p.attr1.x)
+		{
+			// moving the particle to the surface of the wall
+			if (xNew.z < p.attr1.x)
+			{
+				xNew.z = p.attr1.x;
+				positiveForces.z = -1.f * negitiveForces.z;
+			}
+			else
+			{
+				xNew.z = length - p.attr1.x;
+				negitiveForces.z = -1.f * positiveForces.z;
+			}
+
+			// change the velocity
+			vec3 vn = vec3(0.f);
+			vec3 vt = vNew;
+			vn.z = -1.f * vNew.z;
+			vt.z = 0.f;
+
+			vNew = vn + vt * max(0.f, 1.f - Kf * (distance(vn, vec3(0.f)) / distance(vt, vec3(0.f))));
+			vNew *= boundry_damping;
+		}
+		
+		// update the velocity and position
+		verticesB[index].velocity.xyz = vNew * damping;
+		verticesB[index].position.xyz = xNew;
+	}
+	//verticesB[index].attr2.w -= 0.001;
+
+	//verticesA[index].attr2.w *= 0.996f;
+	//verticesB[index].attr2.w *= 0.996f;
+	//const float a = 0.05 * 3.14159 / 180.0;
+	//verticesB[index].position += vec4(0.0004, 0.0004, 0.0004, 0.f);
+	//vertices[index].velocity *= 0.9999;
+	
+}
