@@ -1,10 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define PI 3.1415926f
 #define PARTICLE_COUNT 27000
-
-//layout(local_size_x = PARTICLE_COUNT, local_size_y = 1, local_size_z = 1) in;
 
 struct Vertex {
     vec4 position;
@@ -17,14 +14,6 @@ layout(set = 0, binding = 0) buffer VerticesA {
 	Vertex verticesA[];
 };
 
-layout(set = 0, binding = 1) buffer VerticesB {
-	Vertex verticesB[];
-};
-
-layout(set = 0, binding = 2) buffer SortIds {
-	ivec2 sortIds[];   // cell_id, vertex_idx
-};
-
 layout(set = 0, binding = 4) buffer CellVertArray {
 	int cellVertArray[];  
 };
@@ -33,17 +22,17 @@ layout(set = 0, binding = 5) buffer CellVertCount {
 	int cellVertCount[];   
 };
 
+// Find the cell id of particles and fill the cellVertArray buffer with particle ids
 void main() {
 	uint index = gl_GlobalInvocationID.x;
-	// Don't try to write beyond particle count
     if (index >= PARTICLE_COUNT)
 		return;
 
 	// identity the cell id of each particle
-	float gridSize = 0.1f;
-	float width = 5.f;   // Y
-	float length = 5.f;  // X
-	float height = 5.f;  // Z
+	const float gridSize = 0.1f;
+	const float width = 5.f;   // Y
+	const float length = 5.f;  // X
+	const float height = 5.f;  // Z
 
 	vec3 pos = verticesA[index].position.xyz;
 

@@ -1,11 +1,8 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define WORKGROUP_SIZE 64
 #define PI 3.1415926f
 #define PARTICLE_COUNT 27000
-
-//layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 struct Vertex {
     vec4 position;
@@ -30,6 +27,7 @@ layout(set = 0, binding = 5) buffer CellVertCount {
 	int cellVertCount[];   
 };
 
+// Compute cohesive forces, compressive forces, update radius, move particles
 void main() {
 	uint index = gl_GlobalInvocationID.x;
 	// Don't try to write beyond particle count
@@ -37,34 +35,35 @@ void main() {
 		return;
 	
 	// boundry of the space
-	float width = 5.f;   // Y
-	float length = 5.f;  // X
-	float height = 5.f;  // Z
-	vec4 startPoint = vec4(0.f, 0.f, 0.f, 0.f);
+	const float width = 5.f;   // Y
+	const float length = 5.f;  // X
+	const float height = 5.f;  // Z
+	const vec4 startPoint = vec4(0.f, 0.f, 0.f, 0.f);
 
-	float radius_snow = 0.05f;
-	float radius_ice = 0.025f;
-	float gridSize = 2.f * radius_snow;
+	const float radius_snow = 0.05f;
+	const float radius_ice = 0.025f;
+	const float gridSize = 2.f * radius_snow;
 
-	float neighborRadius = 1.5f * gridSize;
+	const float neighborRadius = 1.5f * gridSize;
 
-	float youngs_modulus_snow = 25000.f;
-	float youngs_modulus_ice = 35000.f;
-	float cohesive_strength_snow = 625.f;   //625
-	float cohesive_strength_ice = 3750.f;   // 3750
+	const float youngs_modulus_snow = 25000.f;
+	const float youngs_modulus_ice = 35000.f;
+	const float cohesive_strength_snow = 625.f;   //625
+	const float cohesive_strength_ice = 3750.f;   // 3750
 
-	float Kq = 0.00005f;
-	float FminW = 0.12275f;
-	float FmaxW = 10000.f;
+	const float Kq = 0.00005f;
+	const float FminW = 0.12275f;
+	const float FmaxW = 10000.f;
 
-	float damping = 0.95f;
-	float boundry_damping = 0.5f;
+	const float damping = 0.95f;
+	const float boundry_damping = 0.5f;
 
-	vec3 gravity = vec3(0.f, -9.82f, 0.f);
+	const vec3 gravity = vec3(0.f, -9.82f, 0.f);
 
-	float Kf = 50.f;
-	float angle_of_repose = 38.f / 180.f * PI;
-	float dt = 0.0017f;
+	const float Kf = 50.f;
+	const float angle_of_repose = 38.f / 180.f * PI;
+	const float dt = 0.0017f;
+
 
 	Vertex p = verticesA[index];
 	vec3 pos = p.position.xyz;
@@ -79,7 +78,6 @@ void main() {
 	int indexX = int(floor(pos.x / gridSize));
 	int indexY = int(floor(pos.y / gridSize));
 	int indexZ = int(floor(pos.z / gridSize));
-
 	int cellId = indexX + indexY * 50 + indexZ * 50 * 50;
 
 	for (int x = -1; x <= 1; x++)
@@ -117,23 +115,7 @@ void main() {
 		}
 	}
 
-
-/*
-
-	for(int i = 0; i < PARTICLE_COUNT; ++i)
-	{	
-		if(i == index) 
-			continue;
-		pos_temp = verticesA[i].position.xyz;
-
-		if(distance(pos_temp, pos) < neighborRadius)
-		{
-			neighborIdx[neighborCount] = i;
-			neighborCount++;
-		}
-	}
-*/
-
+	// update broken bond
 	float temp1 = neighborCount / verticesA[index].attr2.x;
 	if(temp1 < 0.75f && temp1 > 0.f)
 	{
@@ -215,26 +197,18 @@ void main() {
 			else
 				negitiveForces.z += forces.z;
 				
-		
 			// evaluate tensile contact force
 			vec3 vi = p.velocity.xyz;
 			vec3 vj = pNeighbor.velocity.xyz;
 			if (vi != vj)
 			{
 				vec3 ut = -1.f * normalize(vi - vj);
-
-				float tanCoeff = tan(angle_of_repose);   // considering
-
-				vec3 Ft = ut * distance(forces, vec3(0.f)) * tanCoeff * 1.f;    // length?
-				//vec3 Ft = ut * length(forces) * tanCoeff * 1.f;
+				float tanCoeff = tan(angle_of_repose);  
+				vec3 Ft = ut * distance(forces, vec3(0.f)) * tanCoeff * 1.f;   
 				cohesiveForces += Ft;
-			}
-			
-			
+			}				
 		}
-
 	}
-
 	
 	// evaluate compression
 	float minXSquare = min(positiveForces.x * positiveForces.x, negitiveForces.x * negitiveForces.x);
@@ -244,7 +218,6 @@ void main() {
 	compressiveForces = sqrt(minXSquare + minYSquare + minZSquare);
 
 	float p_temp = compressiveForces / (PI * p.attr1.x * p.attr1.x);
-
 	float pi = 100.f * p.attr1.w + 900.f * (1 - p.attr1.w);
 	float e = 2.71828183f;
 	float Dpi = FminW + FmaxW * ((pow(e, (pi / 100.f - 1)) - 0.000335f) / 2980.96f);
@@ -261,11 +234,12 @@ void main() {
 		verticesB[index].velocity.xyz = vec3(0.f);
 	else
 	{
-		vec3 vNew = p.velocity.xyz + (cohesiveForces / p.attr1.y  + gravity) * dt;   //  
+		vec3 vNew = p.velocity.xyz + (cohesiveForces / p.attr1.y  + gravity) * dt;   
 		vec3 xNew = p.position.xyz + vNew * dt;
 
+		// collision handle
 		// hit the ground
-		if (xNew.y < p.attr1.x)  // || xNew.y > length - p.attr1.x
+		if (xNew.y < p.attr1.x || xNew.y > length - p.attr1.x)  
 		{
 			// moving the particle to the surface of the wall
 			if (xNew.y < p.attr1.x)
@@ -341,12 +315,4 @@ void main() {
 		verticesB[index].velocity.xyz = vNew * damping;
 		verticesB[index].position.xyz = xNew;
 	}
-	//verticesB[index].attr2.w -= 0.001;
-
-	//verticesA[index].attr2.w *= 0.996f;
-	//verticesB[index].attr2.w *= 0.996f;
-	//const float a = 0.05 * 3.14159 / 180.0;
-	//verticesB[index].position += vec4(0.0004, 0.0004, 0.0004, 0.f);
-	//vertices[index].velocity *= 0.9999;
-	
 }
