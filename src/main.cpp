@@ -291,9 +291,11 @@ private:
         // cube 
         // float l = 0.98f * (float)n / 10.f;
         const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
-        PointsGenerator::createCube(raw_verts, raw_indices, N_SIDE, OFFSET);
+        PointsGenerator::createCube(raw_verts, raw_indices, 60, OFFSET);
         
-        //PointsGenerator::createSphere(raw_verts, raw_indices, N_SIDE, OFFSET);
+        // PointsGenerator::createSphere(raw_verts, raw_indices, N_SIDE, glm::vec3(0.05f, 1.05f, 0.05f));
+        // PointsGenerator::createTorus(raw_verts, raw_indices, N_SIDE, OFFSET);
+        // std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
     }
 
     void initVulkan() {

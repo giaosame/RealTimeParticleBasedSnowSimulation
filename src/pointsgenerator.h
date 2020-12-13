@@ -65,4 +65,131 @@ namespace PointsGenerator {
             }
         }
     }
+
+    bool inTanglecube(const glm::vec3& p) {
+        const float x2 = p.x * p.x;
+        const float y2 = p.y * p.y;
+        const float z2 = p.z * p.z;
+        return x2* x2 - 5.f * x2 + y2 * y2 - 5.f * y2 + z2 * z2 - 5.f * z2 + 11.8f <= 0;
+    }
+
+    void createTanglecube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    {
+        // x^4 - 5x^2 + y^4 - 5y^2 + z^4 - 5z^2 + 11.8 = 0.
+        
+
+        float l = float(N_SIDE) / 10.f;
+        const float MID = float(N_SIDE) / 2;
+        const float MID_L = MID * l / float(N_SIDE);
+        const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
+
+        int idx = 0;
+        for (int i = 0; i < N_SIDE; ++i)  // z
+        {
+            float z = i * l / float(N_SIDE);
+            for (int j = 0; j < N_SIDE; ++j)  // y
+            {
+                float y = j * l / float(N_SIDE);
+                for (int k = 0; k < N_SIDE; ++k)  // x
+                {
+                    glm::vec3 position = glm::vec3(k * l / float(N_SIDE), y, z);
+                    glm::vec3 diff = position - center;
+
+                    if (!inTanglecube(diff))
+                        continue;
+
+                    Vertex v;
+                    v.position = glm::vec4(position + OFFSET, 1.f);
+                    verts.push_back(v);
+                    indices.push_back(idx);
+                    idx++;
+                }
+            }
+        }
+    }
+
+    bool inHeart(const glm::vec3& p) {
+        const float h = 1.0f, r1 = 1.0f, r2 = 0.0f;
+        const float x2 = p.x * p.x;
+        const float y2 = p.y * p.y;
+        const float z2 = p.z * p.z;
+        const float z3 = p.z * z2;
+        const float temp = x2 + 9.f * y2 / 4.f + z2 - 1.f;
+        return temp * temp * temp - x2 * z3 - 9.f * y2 * z3 / 80.f <= 0;
+    }
+
+    void createHeart(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    {
+        float l = float(N_SIDE) / 10.f;
+        const float MID = float(N_SIDE) / 2;
+        const float MID_L = MID * l / float(N_SIDE);
+        const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
+
+        int idx = 0;
+        for (int i = 0; i < N_SIDE; ++i)  // z
+        {
+            float z = i * l / float(N_SIDE);
+            for (int j = 0; j < N_SIDE; ++j)  // y
+            {
+                float y = j * l / float(N_SIDE);
+                for (int k = 0; k < N_SIDE; ++k)  // x
+                {
+                    glm::vec3 position = glm::vec3(k * l / float(N_SIDE), y, z);
+                    glm::vec3 diff = position - center;
+
+                    if (!inHeart(diff))
+                        continue;
+
+                    Vertex v;
+                    position = glm::vec3(position.y, position.z, position.x);
+                    v.position = glm::vec4(position + OFFSET, 1.f);
+                    verts.push_back(v);
+                    indices.push_back(idx);
+                    idx++;
+                }
+            }
+        }
+    }
+
+    bool inTorus(const glm::vec3& p) {
+        const float r1 = 1.0f, r2 = 0.5f;
+        const float q = sqrt(p.x * p.x + p.z * p.z) - r1;
+        const float len = sqrt(q * q + p.y * p.y);
+        return len - r2 <= 0;
+    }
+
+    void createTorus(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    {
+        float l = float(N_SIDE) / 10.f;
+        const float MID = float(N_SIDE) / 2;
+        const float MID_L = MID * l / float(N_SIDE);
+        const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
+
+        int idx = 0;
+        for (int i = 0; i < N_SIDE; ++i)  // z
+        {
+            float z = i * l / float(N_SIDE);
+            for (int j = 0; j < N_SIDE; ++j)  // y
+            {
+                float y = j * l / float(N_SIDE);
+                for (int k = 0; k < N_SIDE; ++k)  // x
+                {
+                    glm::vec3 position = glm::vec3(k * l / float(N_SIDE), y, z);
+                    glm::vec3 diff = position - center;
+
+                    if (!inTorus(diff))
+                        continue;
+
+                    Vertex v;
+                    position = glm::vec3(position.y, position.z, position.x);
+                    v.position = glm::vec4(position + OFFSET, 1.f);
+                    verts.push_back(v);
+                    indices.push_back(idx);
+                    idx++;
+                }
+            }
+        }
+    }
+
+
 }
