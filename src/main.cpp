@@ -200,11 +200,13 @@ private:
 
     // for compute pipeline
     vk::PipelineLayout computePipelineLayout;
-    vk::Pipeline computePipeline;
+    vk::Pipeline computePipeline1;
     vk::DescriptorSetLayout computeDescriptorSetLayout;
     vk::DescriptorPool computeDescriptorPool;
     std::vector<vk::DescriptorSet> computeDescriptorSet;
     const uint32_t vertexBufferSize = static_cast<uint32_t>(vertices.size() * sizeof(vertices[0]));
+
+    vk::Pipeline computePipeline2;
 
     bool framebufferResized = false;
 
@@ -342,7 +344,8 @@ private:
         // loadModel();
         createVertexBuffers();
         createIndexBuffer();
-        createComputePipeline();
+        createComputePipeline("../src/shaders/computeShader1.spv", computePipeline1);
+        createComputePipeline("../src/shaders/computeShader2.spv", computePipeline2);
         
         createUniformBuffers();
         createDescriptorPool();
@@ -351,9 +354,9 @@ private:
         createSyncObjects();
     }
 
-    void createComputePipeline()
+    void createComputePipeline(std::string computeShaderPath, vk::Pipeline& pipelineIdx)
     {
-        auto computeShaderCode = readFile("../src/shaders/comp.spv");
+        auto computeShaderCode = readFile(computeShaderPath);
         auto computeShaderModule = createShaderModule(computeShaderCode);
         
         vk::PipelineShaderStageCreateInfo computeShaderStageInfo = {};
@@ -480,7 +483,7 @@ private:
         computePipelineInfo.layout = computePipelineLayout;
 
         try {
-            computePipeline = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
+            pipelineIdx  = (vk::Pipeline)device->createComputePipeline(nullptr, computePipelineInfo);
         }
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create compute pipeline!");
@@ -554,7 +557,8 @@ private:
 
         cleanupSwapChain();
 
-        device->destroyPipeline(computePipeline);
+        device->destroyPipeline(computePipeline1);
+        device->destroyPipeline(computePipeline2);
         device->destroyPipelineLayout(computePipelineLayout);
         device->destroyDescriptorPool(computeDescriptorPool);
         device->destroyDescriptorSetLayout(computeDescriptorSetLayout);
@@ -609,7 +613,8 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
-        createComputePipeline();
+        //createComputePipeline("../src/shaders/computeShader1.spv", computePipeline1);
+        //createComputePipeline("../src/shaders/computeShader2.spv", computePipeline2);
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -1694,7 +1699,37 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline1);
+
+            // Bind descriptor sets for compute
+            //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
+            commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
+
+            // Dispatch the compute kernel, with one thread for each vertex
+            commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
+
+            vk::BufferMemoryBarrier computeToComputeBarrier = {};
+            computeToComputeBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+            computeToComputeBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
+            computeToComputeBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier.buffer = vertexBuffer1;
+            computeToComputeBarrier.offset = 0;
+            computeToComputeBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
+
+
+            vk::PipelineStageFlags computeShaderStageFlags_1(vk::PipelineStageFlagBits::eComputeShader);
+            vk::PipelineStageFlags computeShaderStageFlags_2(vk::PipelineStageFlagBits::eComputeShader);
+            commandBuffers[i].pipelineBarrier(computeShaderStageFlags_1,
+                computeShaderStageFlags_2,
+                vk::DependencyFlags(),
+                0, nullptr,
+                1, &computeToComputeBarrier,
+                0, nullptr);
+
+            // Bind the compute pipeline
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline2);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1705,7 +1740,6 @@ private:
 
             // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
             vk::BufferMemoryBarrier computeToVertexBarrier = {};
-            //computeToVertexBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
             computeToVertexBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
             computeToVertexBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToVertexBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
@@ -1714,13 +1748,7 @@ private:
             computeToVertexBarrier.offset = 0;
             computeToVertexBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
 
-            //vkCmdPipelineBarrier(commandBuffers[i],
-            //    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
-            //    VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-            //    0,
-            //    0, nullptr,
-            //    1, &computeToVertexBarrier,
-            //    0, nullptr);
+
             vk::PipelineStageFlags computeShaderStageFlags(vk::PipelineStageFlagBits::eComputeShader);
             vk::PipelineStageFlags vertexShaderStageFlags(vk::PipelineStageFlagBits::eVertexInput);
             commandBuffers[i].pipelineBarrier(computeShaderStageFlags,
@@ -1729,7 +1757,6 @@ private:
                 0, nullptr,
                 1, &computeToVertexBarrier,
                 0, nullptr); 
-            //commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits)
 
             //vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
             //copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);

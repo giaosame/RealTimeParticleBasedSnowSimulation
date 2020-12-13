@@ -290,7 +290,10 @@ void main() {
 		verticesB[index].velocity.xyz = vNew * damping;
 		verticesB[index].position.xyz = xNew;
 	}
-	
+	//verticesB[index].attr2.w -= 0.001;
+
+	//verticesA[index].attr2.w *= 0.996f;
+	//verticesB[index].attr2.w *= 0.996f;
 	//const float a = 0.05 * 3.14159 / 180.0;
 	//verticesB[index].position += vec4(0.0004, 0.0004, 0.0004, 0.f);
 	//vertices[index].velocity *= 0.9999;
