@@ -14,11 +14,11 @@ layout(set = 0, binding = 0) buffer VerticesA {
 	Vertex verticesA[];
 };
 
-layout(set = 0, binding = 4) buffer CellVertArray {
+layout(set = 0, binding = 2) buffer CellVertArray {
 	int cellVertArray[];  
 };
 
-layout(set = 0, binding = 5) buffer CellVertCount {
+layout(set = 0, binding = 3) buffer CellVertCount {
 	int cellVertCount[];   
 };
 

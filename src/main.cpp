@@ -174,14 +174,6 @@ private:
     vk::Buffer vertexBuffer2;
     vk::DeviceMemory vertexBufferMemory2;
 
-    // Storage buffer for sorting
-    vk::Buffer sortIdBuffer;
-    vk::DeviceMemory sortIdBufferMemory;
-
-    // Storage buffer for identifying start and end of grid cell
-    vk::Buffer startEndIdBuffer;
-    vk::DeviceMemory startEndIdBufferMemory;
-
     // storge buffer 
     vk::Buffer cellVertArrayBuffer;
     vk::DeviceMemory cellVertArrayBufferMemory;
@@ -333,7 +325,6 @@ private:
 
     void initVulkan() {
         createInstance();
-        // setupDebugCallback();
         createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
@@ -352,8 +343,6 @@ private:
         // loadModel();
         createVertexBuffers();
         createIndexBuffer();
-        createSortIdBuffer();
-        createStartEndIdBuffer();
 
         createCellVertArrayBuffer();
         createCellVertCountBuffer();
@@ -380,49 +369,35 @@ private:
         computeShaderStageInfo.module = *computeShaderModule;
         computeShaderStageInfo.pName = "main";
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding1{};
-        computeLayoutBinding1.binding = 0;
-        computeLayoutBinding1.descriptorCount = 1;
-        computeLayoutBinding1.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding1.pImmutableSamplers = nullptr;
-        computeLayoutBinding1.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        vk::DescriptorSetLayoutBinding computeLayoutBindingVertices1{};
+        computeLayoutBindingVertices1.binding = 0;
+        computeLayoutBindingVertices1.descriptorCount = 1;
+        computeLayoutBindingVertices1.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingVertices1.pImmutableSamplers = nullptr;
+        computeLayoutBindingVertices1.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding2{};
-        computeLayoutBinding2.binding = 1;
-        computeLayoutBinding2.descriptorCount = 1;
-        computeLayoutBinding2.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding2.pImmutableSamplers = nullptr;
-        computeLayoutBinding2.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        vk::DescriptorSetLayoutBinding computeLayoutBindingVertices2{};
+        computeLayoutBindingVertices2.binding = 1;
+        computeLayoutBindingVertices2.descriptorCount = 1;
+        computeLayoutBindingVertices2.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingVertices2.pImmutableSamplers = nullptr;
+        computeLayoutBindingVertices2.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding3{};
-        computeLayoutBinding3.binding = 2;
-        computeLayoutBinding3.descriptorCount = 1;
-        computeLayoutBinding3.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding3.pImmutableSamplers = nullptr;
-        computeLayoutBinding3.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        vk::DescriptorSetLayoutBinding computeLayoutBindingCellVertexArray{};
+        computeLayoutBindingCellVertexArray.binding = 2;
+        computeLayoutBindingCellVertexArray.descriptorCount = 1;
+        computeLayoutBindingCellVertexArray.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingCellVertexArray.pImmutableSamplers = nullptr;
+        computeLayoutBindingCellVertexArray.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding4{};
-        computeLayoutBinding4.binding = 3;
-        computeLayoutBinding4.descriptorCount = 1;
-        computeLayoutBinding4.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding4.pImmutableSamplers = nullptr;
-        computeLayoutBinding4.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        vk::DescriptorSetLayoutBinding computeLayoutBindingCellVertexCount{};
+        computeLayoutBindingCellVertexCount.binding = 3;
+        computeLayoutBindingCellVertexCount.descriptorCount = 1;
+        computeLayoutBindingCellVertexCount.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingCellVertexCount.pImmutableSamplers = nullptr;
+        computeLayoutBindingCellVertexCount.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        vk::DescriptorSetLayoutBinding computeLayoutBinding5{};
-        computeLayoutBinding5.binding = 4;
-        computeLayoutBinding5.descriptorCount = 1;
-        computeLayoutBinding5.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding5.pImmutableSamplers = nullptr;
-        computeLayoutBinding5.stageFlags = vk::ShaderStageFlagBits::eCompute;
-
-        vk::DescriptorSetLayoutBinding computeLayoutBinding6{};
-        computeLayoutBinding6.binding = 5;
-        computeLayoutBinding6.descriptorCount = 1;
-        computeLayoutBinding6.descriptorType = vk::DescriptorType::eStorageBuffer;
-        computeLayoutBinding6.pImmutableSamplers = nullptr;
-        computeLayoutBinding6.stageFlags = vk::ShaderStageFlagBits::eCompute;
-
-        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2, computeLayoutBinding3, computeLayoutBinding4, computeLayoutBinding5, computeLayoutBinding6 };
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBindingVertices1, computeLayoutBindingVertices2, computeLayoutBindingCellVertexArray, computeLayoutBindingCellVertexCount };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -474,90 +449,62 @@ private:
         }
 
         // Set descriptor set for the old vertices
-        vk::DescriptorBufferInfo computeBufferInfo1 = {};
-        computeBufferInfo1.buffer = vertexBuffer1;
-        computeBufferInfo1.offset = 0;
-        computeBufferInfo1.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
+        vk::DescriptorBufferInfo computeBufferInfoVertices1 = {};
+        computeBufferInfoVertices1.buffer = vertexBuffer1;
+        computeBufferInfoVertices1.offset = 0;
+        computeBufferInfoVertices1.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
 
-        vk::WriteDescriptorSet writeComputeInfo1 = {};
-        writeComputeInfo1.dstSet = computeDescriptorSet[0];
-        writeComputeInfo1.dstBinding = 0;
-        writeComputeInfo1.descriptorCount = 1;
-        writeComputeInfo1.dstArrayElement = 0;
-        writeComputeInfo1.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo1.pBufferInfo = &computeBufferInfo1;
+        vk::WriteDescriptorSet writeComputeInfoVertices1 = {};
+        writeComputeInfoVertices1.dstSet = computeDescriptorSet[0];
+        writeComputeInfoVertices1.dstBinding = 0;
+        writeComputeInfoVertices1.descriptorCount = 1;
+        writeComputeInfoVertices1.dstArrayElement = 0;
+        writeComputeInfoVertices1.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoVertices1.pBufferInfo = &computeBufferInfoVertices1;
 
         // Set descriptor set for the new vertices
-        vk::DescriptorBufferInfo computeBufferInfo2 = {};
-        computeBufferInfo2.buffer = vertexBuffer2;
-        computeBufferInfo2.offset = 0;
-        computeBufferInfo2.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
+        vk::DescriptorBufferInfo computeBufferInfoVertices2 = {};
+        computeBufferInfoVertices2.buffer = vertexBuffer2;
+        computeBufferInfoVertices2.offset = 0;
+        computeBufferInfoVertices2.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
 
-        vk::WriteDescriptorSet writeComputeInfo2 = {};
-        writeComputeInfo2.dstSet = computeDescriptorSet[0];
-        writeComputeInfo2.dstBinding = 1;
-        writeComputeInfo2.descriptorCount = 1;
-        writeComputeInfo2.dstArrayElement = 0;
-        writeComputeInfo2.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo2.pBufferInfo = &computeBufferInfo2;
-
-        // Set descriptor set for the sort ids
-        vk::DescriptorBufferInfo computeBufferInfo3 = {};
-        computeBufferInfo3.buffer = sortIdBuffer;
-        computeBufferInfo3.offset = 0;
-        computeBufferInfo3.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(glm::ivec2));
-
-        vk::WriteDescriptorSet writeComputeInfo3 = {};
-        writeComputeInfo3.dstSet = computeDescriptorSet[0];
-        writeComputeInfo3.dstBinding = 2;
-        writeComputeInfo3.descriptorCount = 1;
-        writeComputeInfo3.dstArrayElement = 0;
-        writeComputeInfo3.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo3.pBufferInfo = &computeBufferInfo3;
-
-        // Set descriptor set for the sort ids
-        vk::DescriptorBufferInfo computeBufferInfo4 = {};
-        computeBufferInfo4.buffer = startEndIdBuffer;
-        computeBufferInfo4.offset = 0;
-        computeBufferInfo4.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(glm::ivec2));
-
-        vk::WriteDescriptorSet writeComputeInfo4 = {};
-        writeComputeInfo4.dstSet = computeDescriptorSet[0];
-        writeComputeInfo4.dstBinding = 3;
-        writeComputeInfo4.descriptorCount = 1;
-        writeComputeInfo4.dstArrayElement = 0;
-        writeComputeInfo4.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo4.pBufferInfo = &computeBufferInfo4;
+        vk::WriteDescriptorSet writeComputeInfoVertices2 = {};
+        writeComputeInfoVertices2.dstSet = computeDescriptorSet[0];
+        writeComputeInfoVertices2.dstBinding = 1;
+        writeComputeInfoVertices2.descriptorCount = 1;
+        writeComputeInfoVertices2.dstArrayElement = 0;
+        writeComputeInfoVertices2.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoVertices2.pBufferInfo = &computeBufferInfoVertices2;
 
         // Set descriptor set for the cell vertex array 
-        vk::DescriptorBufferInfo computeBufferInfo5 = {};
-        computeBufferInfo5.buffer = cellVertArrayBuffer;
-        computeBufferInfo5.offset = 0;
-        computeBufferInfo5.range = static_cast<uint32_t>(N_GRID_CELLS * 6 * sizeof(int));
+        vk::DescriptorBufferInfo computeBufferInfoCellVertexArray = {};
+        computeBufferInfoCellVertexArray.buffer = cellVertArrayBuffer;
+        computeBufferInfoCellVertexArray.offset = 0;
+        computeBufferInfoCellVertexArray.range = static_cast<uint32_t>(N_GRID_CELLS * 6 * sizeof(int));
 
-        vk::WriteDescriptorSet writeComputeInfo5 = {};
-        writeComputeInfo5.dstSet = computeDescriptorSet[0];
-        writeComputeInfo5.dstBinding = 4;
-        writeComputeInfo5.descriptorCount = 1;
-        writeComputeInfo5.dstArrayElement = 0;
-        writeComputeInfo5.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo5.pBufferInfo = &computeBufferInfo5;
+        vk::WriteDescriptorSet writeComputeInfoCellVertexArray = {};
+        writeComputeInfoCellVertexArray.dstSet = computeDescriptorSet[0];
+        writeComputeInfoCellVertexArray.dstBinding = 2;
+        writeComputeInfoCellVertexArray.descriptorCount = 1;
+        writeComputeInfoCellVertexArray.dstArrayElement = 0;
+        writeComputeInfoCellVertexArray.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoCellVertexArray.pBufferInfo = &computeBufferInfoCellVertexArray;
 
         // Set descriptor set for the cell vertex count 
-        vk::DescriptorBufferInfo computeBufferInfo6 = {};
-        computeBufferInfo6.buffer = cellVertCountBuffer;
-        computeBufferInfo6.offset = 0;
-        computeBufferInfo6.range = static_cast<uint32_t>(N_GRID_CELLS * sizeof(int));
+        vk::DescriptorBufferInfo computeBufferInfoCellVertexCount = {};
+        computeBufferInfoCellVertexCount.buffer = cellVertCountBuffer;
+        computeBufferInfoCellVertexCount.offset = 0;
+        computeBufferInfoCellVertexCount.range = static_cast<uint32_t>(N_GRID_CELLS * sizeof(int));
 
-        vk::WriteDescriptorSet writeComputeInfo6 = {};
-        writeComputeInfo6.dstSet = computeDescriptorSet[0];
-        writeComputeInfo6.dstBinding = 5;
-        writeComputeInfo6.descriptorCount = 1;
-        writeComputeInfo6.dstArrayElement = 0;
-        writeComputeInfo6.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo6.pBufferInfo = &computeBufferInfo6;
+        vk::WriteDescriptorSet writeComputeInfoCellVertexCount = {};
+        writeComputeInfoCellVertexCount.dstSet = computeDescriptorSet[0];
+        writeComputeInfoCellVertexCount.dstBinding = 3;
+        writeComputeInfoCellVertexCount.descriptorCount = 1;
+        writeComputeInfoCellVertexCount.dstArrayElement = 0;
+        writeComputeInfoCellVertexCount.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoCellVertexCount.pBufferInfo = &computeBufferInfoCellVertexCount;
 
-        std::array<vk::WriteDescriptorSet, 6> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2, writeComputeInfo3, writeComputeInfo4, writeComputeInfo5, writeComputeInfo6 };
+        std::array<vk::WriteDescriptorSet, 4> writeDescriptorSets = { writeComputeInfoVertices1, writeComputeInfoVertices2, writeComputeInfoCellVertexArray, writeComputeInfoCellVertexCount };
         device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
@@ -576,7 +523,6 @@ private:
         }
 
         vk::ComputePipelineCreateInfo computePipelineInfo = {};
-        //pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
         computePipelineInfo.flags = vk::PipelineCreateFlags();
         computePipelineInfo.stage = computeShaderStageInfo;
         computePipelineInfo.layout = computePipelineLayout;
@@ -618,7 +564,6 @@ private:
         // Map OpenGL buffer object for writing from CUDA on a single GPU
         // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
         // use this buffer
-
         Boids::advanceOneStep(DT);
         Boids::copyParticlesToHost(raw_verts, N_FOR_VIS);
     }
@@ -652,8 +597,6 @@ private:
     }
 
     void cleanup() {
-        // NOTE: instance destruction is handled by UniqueInstance, same for device
-
         cleanupSwapChain();
 
         device->destroyPipeline(computePipelinePhysics);
@@ -662,7 +605,6 @@ private:
         device->destroyPipelineLayout(computePipelineLayout);
         device->destroyDescriptorPool(computeDescriptorPool);
         device->destroyDescriptorSetLayout(computeDescriptorSetLayout);
-        // destroy std::vector<vk::DescriptorSet> computeDescriptorSet;
 
         // The main texture image is used until the end of the program:
         device->destroySampler(textureSampler);
@@ -677,11 +619,6 @@ private:
 
         device->destroyBuffer(indexBuffer);
         device->freeMemory(indexBufferMemory);
-
-        device->destroyBuffer(sortIdBuffer);
-        device->freeMemory(sortIdBufferMemory);
-        device->destroyBuffer(startEndIdBuffer);
-        device->freeMemory(startEndIdBufferMemory);
 
         device->destroyBuffer(cellVertArrayBuffer);
         device->freeMemory(cellVertArrayBufferMemory);
@@ -723,8 +660,6 @@ private:
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
-        //createComputePipeline("../src/shaders/computeShader1.spv", computePipelinePhysics);
-        //createComputePipeline("../src/shaders/computeShader2.spv", computePipelineFillCellVertex);
         createDepthResources();
         createFramebuffers();
         createUniformBuffers();
@@ -766,27 +701,6 @@ private:
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create instance!");
         }
-    }
-
-    void setupDebugCallback() {
-        //if (!enableValidationLayers) return;
-
-        //auto createInfo = vk::DebugUtilsMessengerCreateInfoEXT(
-        //    vk::DebugUtilsMessengerCreateFlagsEXT(),
-        //    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-        //    vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-        //    debugCallback,
-        //    nullptr
-        //);
-
-        //// NOTE: Vulkan-hpp has methods for this, but they trigger linking errors...
-        ////instance->createDebugUtilsMessengerEXT(createInfo);
-        ////instance->createDebugUtilsMessengerEXTUnique(createInfo);
-
-        //// NOTE: reinterpret_cast is also used by vulkan.hpp internally for all these structs
-        //if (CreateDebugUtilsMessengerEXT(*instance, reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT*>(&createInfo), nullptr, &callback) != VK_SUCCESS) {
-        //    throw std::runtime_error("failed to set up debug callback!");
-        //}
     }
 
     void createSurface() {
@@ -1649,48 +1563,6 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
-    void createSortIdBuffer() {
-        vk::DeviceSize bufferSize = sizeof(glm::ivec2) * N_FOR_VIS;
-        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
-
-        vk::Buffer stagingBuffer;
-        vk::DeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
-
-        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, sortIds, (size_t)bufferSize);
-        device->unmapMemory(stagingBufferMemory);
-
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
-            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, sortIdBuffer, sortIdBufferMemory);
-
-        copyBuffer(stagingBuffer, sortIdBuffer, bufferSize);
-
-        device->destroyBuffer(stagingBuffer);
-        device->freeMemory(stagingBufferMemory);
-    }
-
-    void createStartEndIdBuffer() {
-        vk::DeviceSize bufferSize = sizeof(glm::ivec2) * N_GRID_CELLS;
-        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
-
-        vk::Buffer stagingBuffer;
-        vk::DeviceMemory stagingBufferMemory;
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
-
-        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, startEndIds, (size_t)bufferSize);
-        device->unmapMemory(stagingBufferMemory);
-
-        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
-            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, startEndIdBuffer, startEndIdBufferMemory);
-
-        copyBuffer(stagingBuffer, startEndIdBuffer, bufferSize);
-
-        device->destroyBuffer(stagingBuffer);
-        device->freeMemory(stagingBufferMemory);
-    }
-
     void createUniformBuffers() {
         vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -1897,7 +1769,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineResetCellVertex);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineResetCellVertex); 
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1908,7 +1780,7 @@ private:
 
             vk::BufferMemoryBarrier computeToComputeBarrier = {};
             computeToComputeBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
-            computeToComputeBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
+            computeToComputeBarrier.dstAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
             computeToComputeBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier.buffer = cellVertCountBuffer;
@@ -1938,7 +1810,7 @@ private:
 
             vk::BufferMemoryBarrier computeToComputeBarrier1 = {};
             computeToComputeBarrier1.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
-            computeToComputeBarrier1.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
+            computeToComputeBarrier1.dstAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
             computeToComputeBarrier1.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier1.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier1.buffer = cellVertCountBuffer;
@@ -2304,20 +2176,13 @@ private:
 
         return buffer;
     }
-
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-
-        return VK_FALSE;
-    }
 };
 
 
-
 int main() {
-    MyVulkanRenderer app;
+    MyVulkanRenderer myRender;
     try {
-        app.run();
+        myRender.run();
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
