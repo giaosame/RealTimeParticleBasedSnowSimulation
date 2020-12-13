@@ -26,7 +26,7 @@
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
-const int N_FOR_VIS = 27000;
+const int N_FOR_VIS = 1000;
 const float DT = 0.0017f;
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -288,7 +288,7 @@ private:
         Boids::initSimulation(N_FOR_VIS);
 
         // cube 
-        int n = 30;
+        int n = 10;
         int numParticles = n * n * n;
         std::vector<Particle> particles;
         particles.reserve(numParticles);
@@ -1730,10 +1730,13 @@ private:
                 0, nullptr); 
             //commandBuffers[i].pipelineBarrier(vk::PipelineStageFlagBits)
 
+            vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+            copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
+
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
-            vk::Buffer vertexBuffers[] = { vertexBuffer2 };
+            vk::Buffer vertexBuffers[] = { vertexBuffer1 };
             vk::DeviceSize offsets[] = { 0 };
             commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
             commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
