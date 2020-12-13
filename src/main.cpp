@@ -22,6 +22,7 @@
 #include <set>
 
 #include "vertex.h"
+#include "pointsgenerator.h"
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
@@ -153,8 +154,10 @@ private:
 
     vk::CommandPool commandPool;
 
-    Vertex* raw_verts = new Vertex[N_FOR_VIS];
-    uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
+    std::vector<Vertex> raw_verts;
+    std::vector<uint32_t> raw_indices;
+    // Vertex* raw_verts = new Vertex[N_FOR_VIS];
+    // uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
 
     int* cellVertArray = new int[N_GRID_CELLS * 6]{ 0 };
     int* cellVertCount = new int[N_GRID_CELLS]{ 0 };
@@ -282,29 +285,8 @@ private:
 
     void initParticles() {
         // cube 
-        int numParticles = N_SIDE * N_SIDE * N_SIDE;
         // float l = 0.98f * (float)n / 10.f;
-        float l = (float)N_SIDE / 10.f;
-
-        int idx = 0;
-        for (int i = 0; i < N_SIDE; ++i)
-        {
-            for (int j = 0; j < N_SIDE; ++j)
-            {
-                for (int k = 0; k < N_SIDE; ++k)
-                {
-                    glm::vec3 position;
-                    position = glm::vec3(k * l / (float)N_SIDE,
-                        j * l / (float)N_SIDE,
-                        i * l / (float)N_SIDE);
-                    position += glm::vec3(0.05f, 0.05f, 0.05f);
-                   
-                    raw_verts[idx].position = glm::vec4(position, 1.f);
-                    raw_indices[idx] = idx; 
-                    idx++;
-                }
-            }
-        }
+        PointsGenerator::createCube(raw_verts, raw_indices, N_SIDE);
     }
 
     void initVulkan() {
@@ -436,7 +418,7 @@ private:
         vk::DescriptorBufferInfo computeBufferInfoVertices1 = {};
         computeBufferInfoVertices1.buffer = vertexBuffer1;
         computeBufferInfoVertices1.offset = 0;
-        computeBufferInfoVertices1.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
+        computeBufferInfoVertices1.range = static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex));
 
         vk::WriteDescriptorSet writeComputeInfoVertices1 = {};
         writeComputeInfoVertices1.dstSet = computeDescriptorSet[0];
@@ -450,7 +432,7 @@ private:
         vk::DescriptorBufferInfo computeBufferInfoVertices2 = {};
         computeBufferInfoVertices2.buffer = vertexBuffer2;
         computeBufferInfoVertices2.offset = 0;
-        computeBufferInfoVertices2.range = static_cast<uint32_t>(N_FOR_VIS * sizeof(raw_verts[0]));
+        computeBufferInfoVertices2.range = static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex));
 
         vk::WriteDescriptorSet writeComputeInfoVertices2 = {};
         writeComputeInfoVertices2.dstSet = computeDescriptorSet[0];
@@ -1446,7 +1428,7 @@ private:
     }
 
     void createVertexBuffers() {
-        vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+        vk::DeviceSize bufferSize = static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex));
         // vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
         vk::Buffer stagingBuffer;
@@ -1454,7 +1436,7 @@ private:
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
         void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, raw_verts, (size_t)bufferSize);
+        memcpy(data, raw_verts.data(), (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
         // Create buffer for the old vertices
@@ -1477,7 +1459,7 @@ private:
     }
 
     void createIndexBuffer() {
-        vk::DeviceSize bufferSize = sizeof(raw_indices[0]) * N_FOR_VIS;
+        vk::DeviceSize bufferSize = static_cast<uint32_t>(raw_indices.size() * sizeof(raw_indices[0]));
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
 
         vk::Buffer stagingBuffer;
@@ -1485,7 +1467,7 @@ private:
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
         void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, raw_indices, (size_t)bufferSize);
+        memcpy(data, raw_indices.data(), (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
@@ -1833,10 +1815,6 @@ private:
                 1, &computeToVertexBarrier,
                 0, nullptr);
 
-            //vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
-            //copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
-            //std::swap(descriptorSets[0], descriptorSets[1]);
-
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
@@ -1895,7 +1873,7 @@ private:
 
         //updateVertexBuffer(imageIndex);
 
-        vk::DeviceSize bufferSize = sizeof(raw_verts[0]) * N_FOR_VIS;
+        vk::DeviceSize bufferSize = static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex));
         copyBuffer(vertexBuffer2, vertexBuffer1, bufferSize);
         //std::swap(descriptorSets[0], descriptorSets[1]);
         updateUniformBuffer(imageIndex);
@@ -1962,7 +1940,7 @@ private:
         UniformBufferObject ubo{};
         ubo.model = glm::mat4(1.f);
         ubo.view = viewMat;
-        ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.01f, 15.0f);
+        ubo.proj = glm::perspective(glm::radians(45.f), swapChainExtent.width / (float)swapChainExtent.height, 0.01f, 30.0f);
         ubo.proj[1][1] *= -1;
 
         void* data = device->mapMemory(uniformBuffersMemory[currentImage], 0, sizeof(ubo));
@@ -1971,8 +1949,8 @@ private:
     }
 
     void updateVertexBuffer(uint32_t currentImage) {
-        void* data = device->mapMemory(vertexBufferMemory1, 0, sizeof(raw_verts[0]) * N_FOR_VIS);
-        memcpy(data, raw_verts, sizeof(raw_verts[0]) * N_FOR_VIS);
+        void* data = device->mapMemory(vertexBufferMemory1, 0, static_cast<uint32_t>(raw_verts.size() * sizeof(Vertex)));
+        memcpy(data, raw_verts.data(), sizeof(raw_verts[0]) * N_FOR_VIS);
         device->unmapMemory(vertexBufferMemory1);
     }
 

@@ -90,7 +90,7 @@ set(GLM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/external/glm")
 include_directories(${GLM_INCLUDE_DIR})
 
 set(headers
-    src/cell.h
+    src/pointsgenerator.h
     src/cudaMat4.hpp
     src/kernel.h
     src/utilityCore.hpp
