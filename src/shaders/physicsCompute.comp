@@ -3,7 +3,7 @@
 
 #define WORKGROUP_SIZE 64
 #define PI 3.1415926f
-#define PARTICLE_COUNT 8000
+#define PARTICLE_COUNT 27000
 
 //layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
@@ -20,6 +20,14 @@ layout(set = 0, binding = 0) buffer VerticesA {
 
 layout(set = 0, binding = 1) buffer VerticesB {
 	Vertex verticesB[];
+};
+
+layout(set = 0, binding = 4) buffer CellVertArray {
+	int cellVertArray[];  
+};
+
+layout(set = 0, binding = 5) buffer CellVertCount {
+	int cellVertCount[];   
 };
 
 void main() {
@@ -68,6 +76,50 @@ void main() {
 	for(int i = 0; i < 50; ++i)
 		neighborIdx[i] = -1;
 
+	int indexX = int(floor(pos.x / gridSize));
+	int indexY = int(floor(pos.y / gridSize));
+	int indexZ = int(floor(pos.z / gridSize));
+
+	int cellId = indexX + indexY * 50 + indexZ * 50 * 50;
+
+	for (int x = -1; x <= 1; x++)
+	{
+		for (int y = -1; y <= 1; y++)
+		{
+			for (int z = -1; z <= 1; z++)
+			{
+				int curIdxX = indexX + x;
+				int curIdxY = indexY + y;
+				int curIdxZ = indexZ + z;
+
+				if (curIdxX < 0 || curIdxX >= 50
+                    || curIdxY < 0 || curIdxY >= 50
+                    || curIdxZ < 0 || curIdxZ >= 50)
+                    continue;
+
+				int curCellId = curIdxZ * 50 * 50 + curIdxY * 50 + curIdxX;
+
+				int cellVertNum = cellVertCount[curCellId];
+				if(cellVertNum > 0)
+				{
+					for(int i = 0; i < cellVertNum; ++i)
+					{
+						int idTemp = cellVertArray[curCellId * 6 + i];
+						float dist = distance(pos, verticesA[idTemp].position.xyz);
+						if(idTemp != index && dist <= neighborRadius)
+						{
+							neighborIdx[neighborCount] = idTemp;
+							neighborCount++;
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+/*
+
 	for(int i = 0; i < PARTICLE_COUNT; ++i)
 	{	
 		if(i == index) 
@@ -80,6 +132,7 @@ void main() {
 			neighborCount++;
 		}
 	}
+*/
 
 	float temp1 = neighborCount / verticesA[index].attr2.x;
 	if(temp1 < 0.75f && temp1 > 0.f)
@@ -208,7 +261,7 @@ void main() {
 		verticesB[index].velocity.xyz = vec3(0.f);
 	else
 	{
-		vec3 vNew = p.velocity.xyz + (cohesiveForces / p.attr1.y  + gravity) * dt;   // p.attr1.y
+		vec3 vNew = p.velocity.xyz + (cohesiveForces / p.attr1.y  + gravity) * dt;   //  
 		vec3 xNew = p.position.xyz + vNew * dt;
 
 		// hit the ground

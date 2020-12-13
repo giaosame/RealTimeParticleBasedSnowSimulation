@@ -27,7 +27,7 @@
 #include "../external/stb_image.h"
 
 const int N_GRID_CELLS = 125000;
-const int N_SIDE = 20;
+const int N_SIDE = 30;
 const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
 const int WIDTH = 800;
@@ -177,6 +177,10 @@ private:
     glm::ivec2* sortIds = new glm::ivec2[N_FOR_VIS];
     glm::ivec2* startEndIds = new glm::ivec2[N_GRID_CELLS];
 
+    // lala
+    int* cellVertArray = new int[N_GRID_CELLS * 6]{ 0 };
+    int* cellVertCount = new int[N_GRID_CELLS]{ 0 };
+
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
@@ -195,6 +199,13 @@ private:
     // Storage buffer for identifying start and end of grid cell
     vk::Buffer startEndIdBuffer;
     vk::DeviceMemory startEndIdBufferMemory;
+
+    // storge buffer 
+    // lala
+    vk::Buffer cellVertArrayBuffer;
+    vk::DeviceMemory cellVertArrayBufferMemory;
+    vk::Buffer cellVertCountBuffer;
+    vk::DeviceMemory cellVertCountBufferMemory;
 
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
@@ -363,6 +374,10 @@ private:
         createSortIdBuffer();
         createStartEndIdBuffer();
 
+        // lala
+        createCellVertArrayBuffer();
+        createCellVertCountBuffer();
+
         createComputePipeline("../src/shaders/physicsCompute.spv", computePipelinePhysics);
         createComputePipeline("../src/shaders/sorting.spv", computePipelineSorting);
         createComputePipeline("../src/shaders/findStartEnd.spv", computePipelineFindStartEnd);
@@ -413,7 +428,21 @@ private:
         computeLayoutBinding4.pImmutableSamplers = nullptr;
         computeLayoutBinding4.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2, computeLayoutBinding3, computeLayoutBinding4 };
+        vk::DescriptorSetLayoutBinding computeLayoutBinding5{};
+        computeLayoutBinding5.binding = 4;
+        computeLayoutBinding5.descriptorCount = 1;
+        computeLayoutBinding5.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding5.pImmutableSamplers = nullptr;
+        computeLayoutBinding5.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        vk::DescriptorSetLayoutBinding computeLayoutBinding6{};
+        computeLayoutBinding6.binding = 5;
+        computeLayoutBinding6.descriptorCount = 1;
+        computeLayoutBinding6.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBinding6.pImmutableSamplers = nullptr;
+        computeLayoutBinding6.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBinding1, computeLayoutBinding2, computeLayoutBinding3, computeLayoutBinding4, computeLayoutBinding5, computeLayoutBinding6 };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -432,7 +461,7 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 4;
+        poolSizes[0].descriptorCount = 6;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -518,9 +547,37 @@ private:
         writeComputeInfo4.descriptorCount = 1;
         writeComputeInfo4.dstArrayElement = 0;
         writeComputeInfo4.descriptorType = vk::DescriptorType::eStorageBuffer;
-        writeComputeInfo4.pBufferInfo = &computeBufferInfo3;
+        writeComputeInfo4.pBufferInfo = &computeBufferInfo4;
 
-        std::array<vk::WriteDescriptorSet, 4> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2, writeComputeInfo3, writeComputeInfo4 };
+        // Set descriptor set for the cell vertex array 
+        vk::DescriptorBufferInfo computeBufferInfo5 = {};
+        computeBufferInfo5.buffer = cellVertArrayBuffer;
+        computeBufferInfo5.offset = 0;
+        computeBufferInfo5.range = static_cast<uint32_t>(N_GRID_CELLS * 6 * sizeof(int));
+
+        vk::WriteDescriptorSet writeComputeInfo5 = {};
+        writeComputeInfo5.dstSet = computeDescriptorSet[0];
+        writeComputeInfo5.dstBinding = 4;
+        writeComputeInfo5.descriptorCount = 1;
+        writeComputeInfo5.dstArrayElement = 0;
+        writeComputeInfo5.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo5.pBufferInfo = &computeBufferInfo5;
+
+        // Set descriptor set for the cell vertex count 
+        vk::DescriptorBufferInfo computeBufferInfo6 = {};
+        computeBufferInfo6.buffer = cellVertCountBuffer;
+        computeBufferInfo6.offset = 0;
+        computeBufferInfo6.range = static_cast<uint32_t>(N_GRID_CELLS * sizeof(int));
+
+        vk::WriteDescriptorSet writeComputeInfo6 = {};
+        writeComputeInfo6.dstSet = computeDescriptorSet[0];
+        writeComputeInfo6.dstBinding = 5;
+        writeComputeInfo6.descriptorCount = 1;
+        writeComputeInfo6.dstArrayElement = 0;
+        writeComputeInfo6.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfo6.pBufferInfo = &computeBufferInfo6;
+
+        std::array<vk::WriteDescriptorSet, 6> writeDescriptorSets = { writeComputeInfo1, writeComputeInfo2, writeComputeInfo3, writeComputeInfo4, writeComputeInfo5, writeComputeInfo6 };
         device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
@@ -645,6 +702,11 @@ private:
         device->freeMemory(sortIdBufferMemory);
         device->destroyBuffer(startEndIdBuffer);
         device->freeMemory(startEndIdBufferMemory);
+
+        device->destroyBuffer(cellVertArrayBuffer);
+        device->freeMemory(cellVertArrayBufferMemory);
+        device->destroyBuffer(cellVertCountBuffer);
+        device->freeMemory(cellVertCountBufferMemory);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device->destroySemaphore(renderFinishedSemaphores[i]);
@@ -1565,6 +1627,48 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
+    void createCellVertArrayBuffer() {
+        vk::DeviceSize bufferSize = sizeof(int) * N_GRID_CELLS * 6;
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, cellVertArray, (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, cellVertArrayBuffer, cellVertArrayBufferMemory);
+
+        copyBuffer(stagingBuffer, cellVertArrayBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
+    void createCellVertCountBuffer() {
+        vk::DeviceSize bufferSize = sizeof(int) * N_GRID_CELLS;
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, cellVertCount, (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst |
+            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, cellVertCountBuffer, cellVertCountBufferMemory);
+
+        copyBuffer(stagingBuffer, cellVertCountBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
     void createSortIdBuffer() {
         vk::DeviceSize bufferSize = sizeof(glm::ivec2) * N_FOR_VIS;
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
@@ -1813,23 +1917,23 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSorting);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
 
             // Dispatch the compute kernel, with one thread for each vertex
-            commandBuffers[i].dispatch(N_FOR_VIS, 1, 1);
+            commandBuffers[i].dispatch(N_GRID_CELLS, 1, 1);
 
             vk::BufferMemoryBarrier computeToComputeBarrier = {};
             computeToComputeBarrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
             computeToComputeBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToComputeBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
-            computeToComputeBarrier.buffer = vertexBuffer2;
+            computeToComputeBarrier.buffer = cellVertCountBuffer;
             computeToComputeBarrier.offset = 0;
-            computeToComputeBarrier.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
+            computeToComputeBarrier.size = N_GRID_CELLS * sizeof(int);  
 
 
             vk::PipelineStageFlags computeShaderStageFlags_1(vk::PipelineStageFlagBits::eComputeShader);
@@ -1843,7 +1947,7 @@ private:
 
             // Bind the compute pipeline
             //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
-            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSorting);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineFindStartEnd);
 
             // Bind descriptor sets for compute
             //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
@@ -1857,9 +1961,9 @@ private:
             computeToComputeBarrier1.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToComputeBarrier1.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToComputeBarrier1.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
-            computeToComputeBarrier1.buffer = vertexBuffer2;
+            computeToComputeBarrier1.buffer = cellVertCountBuffer;
             computeToComputeBarrier1.offset = 0;
-            computeToComputeBarrier1.size = N_FOR_VIS * sizeof(Vertex);  //vertexBufferSize
+            computeToComputeBarrier1.size = N_GRID_CELLS * sizeof(int);  //vertexBufferSize
 
 
             vk::PipelineStageFlags computeShaderStageFlags_3(vk::PipelineStageFlagBits::eComputeShader);
