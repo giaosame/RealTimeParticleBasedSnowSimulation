@@ -53,7 +53,7 @@ struct UniformBufferObject {
 
 
 const int N_GRID_CELLS = 1000000;
-const int N_SIDE = 30;
+const int N_SIDE = 10;
 const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
 const int WIDTH = 800;

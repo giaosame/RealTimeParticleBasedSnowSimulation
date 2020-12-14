@@ -9,10 +9,14 @@ Real-time Particle-based Snow Simulation with Vulkan
 
 **Haoyu Sui:** [LinkedIn](http://linkedin.com/in/haoyu-sui-721284192)
 
-<!-- Tested on: Windows 10, i5-9600K @ 3.70GHz 16GB, RTX 2070 SUPER 8GB   -->
+**All tests are performed:** Windows 10, i5-9600K @ 3.70GHz 16GB, RTX 2070 SUPER 8GB 
+
 ----
 
 ![](presentations/imgs/corner_sphere.gif)
+
+In the above scene, there are a total of 270,000 particles. For rendering, we load a spherical model for each particle, so there are a total of 270,000 * 180 = 4,860,000 vertices. The fps is about 115. If we just render the particles as points, it could be much faster.
+
 
 ### Brief description
 
@@ -34,7 +38,7 @@ We have done some physical simulation projects before, such as water and colloid
 
 ### Implementation Overview  
 
-The simulation processes is duvided into the following steps:
+The simulation processes are duvided into the following steps:
 	
 	while animating do
 		Find neighbors;
@@ -61,7 +65,7 @@ Vulkan compute pipelines are used to accelerate the attributes compuation, they 
 		- Update the position of the vertices sphere 
 
 
-### Results Analysis  
+### Results  
 
 In this project, we achieved three different implementations of this simulation processes:
 
@@ -73,10 +77,30 @@ In this project, we achieved three different implementations of this simulation 
 
 Here we will show our results and analyze their efficiency and performance. 
 
+**Results of different implementations:**
+
 | Vulkan compute and graphics pipeline |  CPU + Houdini | CUDA + OpenGL (rendering points) |
 |---|---| ---|
 |![](presentations/imgs/corner_sphere.gif)|![](presentations/imgs/softSnow_houdini.gif)| ![](presentations/imgs/corner_points.gif)|
 
+**Results of different particle number:**
+
+| 1,000 Particles |  8,000 Particles | 27,000 Particles |
+|---|---| ---|
+|![](presentations/imgs/sphere_10.gif)|![](presentations/imgs/sphere_20.gif)| ![](presentations/imgs/corner_sphere.gif)|
+
+| 64,000 Particles |  125,000 Particles | 
+|---|---| 
+|![](presentations/imgs/sphere_40.gif)|![](presentations/imgs/sphere_50.gif)|
+
+
+**Performance Analysis**
+
+ |    | CPU (without rendering) | CUDA + OpenGL | Vulkan graphics + compute shaders |
+| ------------- |-------------|-------------|-------------|
+| Computing time per frame    | 29,600 ms    | 29.9 ms     | 2.3 ms     | 
+
+![](presentations/imgs/particleNum_analysis.png)
 
 ### Difficulties and harvest 
 
@@ -134,4 +158,4 @@ Our main gain is the understanding and learning of Vulkan. Our project did not u
 
 [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
 
-Many thanks and recommendations to the [RenderDoc](https://renderdoc.org/) graphics debugger. It quite useful for us to capture each frame and inspect details of application using Vulkan, OpenGL ES etc.
+Many thanks and recommendations to the [RenderDoc](https://renderdoc.org/) graphics debugger. It quite useful for us to capture each frame and inspect details of application using Vulkan, OpenGL ES, etc.

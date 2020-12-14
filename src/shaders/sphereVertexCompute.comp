@@ -28,7 +28,7 @@ layout(set = 0, binding = 5) buffer SphereVerts {
 	Vertex sphereVerts[];   
 };
 
-// Compute cohesive forces, compressive forces, update radius, move particles
+// Compute the sphere vertices position
 void main() {
 	const int PARTICLE_COUNT = num_vertices * SPHERE_POINTS;
 	uint index = gl_GlobalInvocationID.x;
