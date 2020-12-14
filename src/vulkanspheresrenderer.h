@@ -198,8 +198,8 @@ private:
         // std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
         //PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, OFFSET, glm::vec3(1.f, 1.f, 1.f));
         //PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 4.f, 0.05f), glm::vec3(0.5f, 1.f, 1.f), glm::vec3(0.f, 0.f, 0.f));
-        PointsGenerator::createTorus(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 6.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
-        PointsGenerator::createHeart(raw_verts, raw_indices, idxForWholeVertices, 20, glm::vec3(0.05f, 3.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
+        //PointsGenerator::createTorus(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 6.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
+        PointsGenerator::createTanglecube(raw_verts, raw_indices, idxForWholeVertices, 45, glm::vec3(2.05f, 3.06f, 2.05f), glm::vec3(1.f, 0.f, 0.f));
 
         int sphereIdx = 0;
         for (int i = 0; i < raw_verts.size(); i++) {// 27000
@@ -213,6 +213,7 @@ private:
                 sphereIdx++;
             }
         }
+        std::cout << "Number of raw_verts: " << raw_verts.size() << std::endl;
         std::cout << "Number of sphereIdx: " << sphereIdx << std::endl;
     }
 

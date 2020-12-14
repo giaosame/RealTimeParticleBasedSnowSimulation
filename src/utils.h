@@ -71,11 +71,11 @@ bool rightMouseDown = false;
 double previousX = 0.0;
 double previousY = 0.0;
 
-float r = 10.0f;
+float r = 20.0f;
 float theta = 1.0f;
 float phi = -0.7f;
 
-glm::vec3 eye = glm::vec3(5.0f, 5.0f, r);
+glm::vec3 eye = glm::vec3(5.0f, 10.0f, r);
 glm::mat4 viewMat = glm::lookAt(eye, glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 static void updateOrbit(float deltaX, float deltaY, float deltaZ) {
