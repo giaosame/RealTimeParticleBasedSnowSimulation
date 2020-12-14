@@ -37,9 +37,9 @@ void main() {
 	int temp = num_vertices;
 	// identity the cell id of each particle
 	const float gridSize = 0.1f;
-	const float width = 5.f;   // Y
-	const float length = 5.f;  // X
-	const float height = 5.f;  // Z
+	const float width = 10.f;   // Y
+	const float length = 10.f;  // X
+	const float height = 10.f;  // Z
 
 	vec3 pos = verticesA[index].position.xyz;
 
@@ -47,7 +47,7 @@ void main() {
 	int indexY = int(floor(pos.y / gridSize));
 	int indexZ = int(floor(pos.z / gridSize));
 
-	int cellId = indexX + indexY * 50 + indexZ * 50 * 50;
+	int cellId = indexX + indexY * 100 + indexZ * 100 * 100;
 	int idxTemp = atomicAdd(cellVertCount[cellId], 1);
 	cellVertArray[cellId * 6 + idxTemp] = int(index);
 }

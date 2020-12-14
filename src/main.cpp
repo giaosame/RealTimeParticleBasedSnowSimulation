@@ -26,7 +26,7 @@
 #include "../external/tiny_obj_loader.h"
 #include "../external/stb_image.h"
 
-const int N_GRID_CELLS = 125000;
+const int N_GRID_CELLS = 1000000;
 const int N_SIDE = 30;
 const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
@@ -292,10 +292,10 @@ private:
         // float l = 0.98f * (float)n / 10.f;
         int idxForWholeVertices = 0;
         const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
-        PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, 15, OFFSET, glm::vec3(1.f, 1.f, 0.f));
+         PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, 20, OFFSET, glm::vec3(1.f, 1.f, 0.f));
         std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
         
-        // PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.15f, 0.05f), glm::vec3(1.f, 1.f, 1.f));
+         PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, 20, glm::vec3(0.05f, 3.15f, 0.05f), glm::vec3(1.f, 1.f, 1.f));
         // PointsGenerator::createTorus(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
         // PointsGenerator::createHeart(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
         std::cout << "Number of vertices: " << raw_verts.size() << std::endl;

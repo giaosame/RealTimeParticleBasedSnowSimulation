@@ -41,9 +41,9 @@ void main() {
 		return;
 	
 	// boundry of the space
-	const float width = 5.f;   // Y
-	const float length = 5.f;  // X
-	const float height = 5.f;  // Z
+	const float width = 10.f;   // Y
+	const float length = 10.f;  // X
+	const float height = 10.f;  // Z
 	const vec4 startPoint = vec4(0.f, 0.f, 0.f, 0.f);
 
 	const float radius_snow = 0.05f;
@@ -61,13 +61,13 @@ void main() {
 	const float FminW = 0.12275f;
 	const float FmaxW = 10000.f;
 
-	const float damping = 0.95f;
+	const float damping = 0.9f;
 	const float boundry_damping = 0.5f;
 
-	const vec3 gravity = vec3(0.f, -1.82f, 0.f);
+	const vec3 gravity = vec3(0.f, -9.82f, 0.f);
 
 	const float Kf = 50.f;
-	const float angle_of_repose = 38.f / 180.f * PI;
+	const float angle_of_repose = 48.f / 180.f * PI;
 	const float dt = 0.0017f;
 
 
@@ -77,14 +77,14 @@ void main() {
 	// find neighbors
 	vec3 pos_temp;
 	int neighborCount = 0;
-	int neighborIdx[50];
-	for(int i = 0; i < 50; ++i)
+	int neighborIdx[40];
+	for(int i = 0; i < 40; ++i)
 		neighborIdx[i] = -1;
 
 	int indexX = int(floor(pos.x / gridSize));
 	int indexY = int(floor(pos.y / gridSize));
 	int indexZ = int(floor(pos.z / gridSize));
-	int cellId = indexX + indexY * 50 + indexZ * 50 * 50;
+	int cellId = indexX + indexY * 100 + indexZ * 100 * 100;
 
 	for (int x = -1; x <= 1; x++)
 	{
@@ -96,12 +96,12 @@ void main() {
 				int curIdxY = indexY + y;
 				int curIdxZ = indexZ + z;
 
-				if (curIdxX < 0 || curIdxX >= 50
-                    || curIdxY < 0 || curIdxY >= 50
-                    || curIdxZ < 0 || curIdxZ >= 50)
+				if (curIdxX < 0 || curIdxX >= 100
+                    || curIdxY < 0 || curIdxY >= 100
+                    || curIdxZ < 0 || curIdxZ >= 100)
                     continue;
 
-				int curCellId = curIdxZ * 50 * 50 + curIdxY * 50 + curIdxX;
+				int curCellId = curIdxZ * 100 * 100 + curIdxY * 100 + curIdxX;
 
 				int cellVertNum = cellVertCount[curCellId];
 				if(cellVertNum > 0)
