@@ -94,9 +94,11 @@ set(headers
     src/cudaMat4.hpp
     src/kernel.h
     src/utilityCore.hpp
-    src/Particle.h
+    src/particle.h
     src/vertex.h
-    src/vulkanrenderer.h
+    src/vulkanpointsrenderer.h
+    src/vulkanspheresrenderer.h
+    src/utils.h
     external/tiny_obj_loader.h
     external/stb_image.h
     )
@@ -105,7 +107,6 @@ set(sources
     src/kernel.cu
     src/main.cpp
     src/utilityCore.cpp
-    src/vulkanrenderer.cpp
     )
 
 list(SORT headers)
