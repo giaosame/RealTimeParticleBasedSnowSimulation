@@ -213,7 +213,6 @@ private:
                 sphereIdx++;
             }
         }
-        std::cout << "Number of raw_verts: " << raw_verts.size() << std::endl;
         std::cout << "Number of sphereIdx: " << sphereIdx << std::endl;
     }
 
