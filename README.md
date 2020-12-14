@@ -13,10 +13,13 @@ Real-time Particle-based Snow Simulation with Vulkan
 
 ----
 
-![](presentations/imgs/corner_sphere.gif)
+![](presentations/imgs/double_1.gif)
 
 In the above scene, there are a total of 270,000 particles. For rendering, we load a spherical model for each particle, so there are a total of 270,000 * 180 = 4,860,000 vertices. The fps is about 115. If we just render the particles as points, it could be much faster.
 
+| Heart |  Ball | Box |
+|---|---| ---|
+|![](presentations/imgs/heart_1.gif)|![](presentations/imgs/writeball_1.gif)| ![](presentations/imgs/writecube_1.gif)|
 
 ### Brief Description
 

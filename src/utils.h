@@ -53,11 +53,11 @@ struct UniformBufferObject {
 
 
 const int N_GRID_CELLS = 1000000;
-const int N_SIDE = 10;
+const int N_SIDE = 30;
 const int N_FOR_VIS = N_SIDE * N_SIDE * N_SIDE;
 const float DT = 0.0017f;
-const int WIDTH = 800;
-const int HEIGHT = 600;
+const int WIDTH = 1000;
+const int HEIGHT = 800;
 const float BALL_SCALE_FACTOR = 0.01f;
 const glm::mat4 BALL_SCALE_MAT = glm::scale(glm::mat4(1), glm::vec3(BALL_SCALE_FACTOR, BALL_SCALE_FACTOR, BALL_SCALE_FACTOR));
 

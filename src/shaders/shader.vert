@@ -27,7 +27,7 @@ void main() {
     gl_PointSize = 2.0;
     //fragColor = normalize(inVelocity.xyz);
     float grayColor = inColor.x * 0.299 + inColor.y * 0.587 + inColor.z + 0.114;
-    //fragColor = vec3(grayColor, grayColor, grayColor);
-    fragColor = vec3(inColor);
+    fragColor = vec3(grayColor, grayColor, grayColor);
+    //fragColor = vec3(inColor);
     //fragTexCoord = inTexCoord;
 }

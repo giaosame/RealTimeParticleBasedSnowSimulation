@@ -60,7 +60,7 @@ void main() {
 	const float FminW = 0.12275f;
 	const float FmaxW = 10000.f;
 
-	const float damping = 0.98f;
+	const float damping = 1.f;
 	const float boundry_damping = 0.5f;
 
 	const vec3 gravity = vec3(0.f, -9.82f, 0.f);
