@@ -194,8 +194,9 @@ private:
 
         int idxForWholeVertices = 0;
         const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
-        PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, 30, OFFSET, glm::vec3(1.f, 1.f, 1.f));
+        //PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, 30, OFFSET, glm::vec3(1.f, 1.f, 1.f));
         // std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
+        PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, 30, OFFSET, glm::vec3(1.f, 1.f, 1.f));
 
         int sphereIdx = 0;
         for (int i = 0; i < raw_verts.size(); i++) {// 27000

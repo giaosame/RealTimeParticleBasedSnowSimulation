@@ -12,7 +12,7 @@ Real-time Particle-based Snow Simulation with Vulkan
 <!-- Tested on: Windows 10, i5-9600K @ 3.70GHz 16GB, RTX 2070 SUPER 8GB   -->
 ----
 
-![](presentations/imgs/softSnow1.gif)
+![](presentations/imgs/corner1.gif)
 
 **Brief description**
 
