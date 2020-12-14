@@ -1,4 +1,4 @@
-Real-time Particle-based Snow Simulation with Vulkan (still working on it)
+Real-time Particle-based Snow Simulation with Vulkan
 ====================
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture**
@@ -50,7 +50,7 @@ The simulation is duvided into steps seen in the following algorithm:
 
 - Open the CMake GUI to configure the project
 
-- Make the "Source" directory points to the directory cuda-getting-started.
+- Make the "Source" directory points to the directory
 Click Configure.
 
 - Select your Visual Studio version, and x64 for your platform. 
