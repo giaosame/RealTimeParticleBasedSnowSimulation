@@ -88,11 +88,11 @@ Here we will show our results and analyze their efficiency and performance.
 
 **Results of different particle number:**
 
-| 1,000 Particles |  8,000 Particles | 27,000 Particles |
+| 1k Particles (180K vertices) |  8k Particles (1.44M vertices) | 27k Particles (4.86M vertices) |
 |---|---| ---|
 |![](presentations/imgs/sphere_10.gif)|![](presentations/imgs/sphere_20.gif)| ![](presentations/imgs/corner_sphere.gif)|
 
-| 64,000 Particles |  125,000 Particles | 
+| 64K Particles (11.52M vertices) |  125K Particles (22.5M vertices) | 
 |---|---| 
 |![](presentations/imgs/sphere_40.gif)|![](presentations/imgs/sphere_50.gif)|
 
@@ -175,4 +175,10 @@ Our main gain is the understanding and learning of Vulkan. Our project did not u
 
 [Vulkan Tutorial](https://vulkan-tutorial.com/Introduction)
 
+[RenderDoc](https://renderdoc.org/)
+
+### Acknowledgements 
+
 Many thanks and recommendations to the [RenderDoc](https://renderdoc.org/) graphics debugger. It quite useful for us to capture each frame and inspect details of application using Vulkan, OpenGL ES, etc.
+
+Thank you so much Xuecheng Sun for your help with this project!
