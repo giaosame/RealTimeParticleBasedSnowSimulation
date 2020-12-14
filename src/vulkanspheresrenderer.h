@@ -66,11 +66,16 @@ private:
 
     std::vector<Vertex> raw_verts;
     std::vector<uint32_t> raw_indices;
+    std::vector<Vertex> sphere_verts;
+    std::vector<uint32_t> sphere_indices;
     // Vertex* raw_verts = new Vertex[N_FOR_VIS];
     // uint32_t* raw_indices = new uint32_t[N_FOR_VIS];
 
     int* cellVertArray = new int[N_GRID_CELLS * 6]{ 0 };
     int* cellVertCount = new int[N_GRID_CELLS]{ 0 };
+
+    std::vector<Vertex> model_verts;
+    std::vector<uint32_t> model_indices;
 
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
@@ -92,6 +97,10 @@ private:
     vk::Buffer cellVertCountBuffer;
     vk::DeviceMemory cellVertCountBufferMemory;
 
+    // sphere vertices storge buffer
+    vk::Buffer sphereVertsBuffer;
+    vk::DeviceMemory sphereVertsBufferMemory;
+
     vk::Buffer indexBuffer;
     vk::DeviceMemory indexBufferMemory;
 
@@ -112,6 +121,7 @@ private:
     vk::Pipeline computePipelinePhysics;
     vk::Pipeline computePipelineFillCellVertex;
     vk::Pipeline computePipelineResetCellVertex;
+    vk::Pipeline computePipelineSphereVertex;
     vk::DescriptorSetLayout computeDescriptorSetLayout;
     vk::DescriptorPool computeDescriptorPool;
     std::vector<vk::DescriptorSet> computeDescriptorSet;
@@ -180,17 +190,27 @@ private:
     }
 
     void initParticles() {
-        // cube 
-        // float l = 0.98f * (float)n / 10.f;
+        loadModel();
+
         int idxForWholeVertices = 0;
         const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
-        PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, 30, OFFSET, glm::vec3(1.f, 1.f, 1.f));
-        std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
-        
-        PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, 20, glm::vec3(0.05f, 4.f, 0.05f), glm::vec3(0.75f, 0.75f, 0.75f), glm::vec3(0.f, 0.f, 0.f));
-        //PointsGenerator::createTorus(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
-        // PointsGenerator::createHeart(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
-        std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
+        PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, 30, OFFSET, glm::vec3(1.f, 1.f, 1.f));
+        // std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
+
+        int sphereIdx = 0;
+        for (int i = 0; i < raw_verts.size(); i++) {// 27000
+            auto translation = raw_verts[i].position;
+            translation.w = 0.f;
+            for (int j = 0; j < model_verts.size(); j++) { // 180
+                Vertex v = model_verts[j];
+                v.position += translation;
+                sphere_verts.push_back(v);
+                sphere_indices.push_back(sphereIdx);
+                sphereIdx++;
+            }
+        }
+        std::cout << "Number of raw_verts: " << raw_verts.size() << std::endl;
+        std::cout << "Number of sphereIdx: " << sphereIdx << std::endl;
     }
 
     void initVulkan() {
@@ -213,14 +233,17 @@ private:
         // loadModel();
         createVertexBuffers();
         createIndexBuffer();
-        createNumVertsBuffer();
+        createNumVertsBuffer(); 
 
         createCellVertArrayBuffer();
         createCellVertCountBuffer();
+        createSphereVertsBuffer();
+
 
         createComputePipeline("../src/shaders/physicsCompute.spv", computePipelinePhysics);
         createComputePipeline("../src/shaders/fillCellVertexInfo.spv", computePipelineFillCellVertex);
         createComputePipeline("../src/shaders/resetCellVertexInfo.spv", computePipelineResetCellVertex); 
+        createComputePipeline("../src/shaders/sphereVertexCompute.spv", computePipelineSphereVertex);
 
         createuniformUboBuffers();
         createDescriptorPool();
@@ -275,8 +298,15 @@ private:
         computeLayoutBindingNumVerts.pImmutableSamplers = nullptr;
         computeLayoutBindingNumVerts.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
+        vk::DescriptorSetLayoutBinding computeLayoutBindingSphereVerts{};
+        computeLayoutBindingSphereVerts.binding = 5;
+        computeLayoutBindingSphereVerts.descriptorCount = 1;
+        computeLayoutBindingSphereVerts.descriptorType = vk::DescriptorType::eStorageBuffer;
+        computeLayoutBindingSphereVerts.pImmutableSamplers = nullptr;
+        computeLayoutBindingSphereVerts.stageFlags = vk::ShaderStageFlagBits::eCompute;
+
         std::vector<vk::DescriptorSetLayoutBinding> bindings = { computeLayoutBindingVertices1, computeLayoutBindingVertices2,
-            computeLayoutBindingCellVertexArray, computeLayoutBindingCellVertexCount, computeLayoutBindingNumVerts };
+            computeLayoutBindingCellVertexArray, computeLayoutBindingCellVertexCount, computeLayoutBindingNumVerts, computeLayoutBindingSphereVerts };
 
         vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {};
         //descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -295,7 +325,7 @@ private:
         //VkDescriptorPoolSize poolSizes[1];
         std::array<vk::DescriptorPoolSize, 1> poolSizes{};
         poolSizes[0].type = vk::DescriptorType::eStorageBuffer;
-        poolSizes[0].descriptorCount = 6;
+        poolSizes[0].descriptorCount = 10;
 
         vk::DescriptorPoolCreateInfo descriptorPoolInfo = {};
         //descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -386,7 +416,7 @@ private:
         vk::DescriptorBufferInfo computeBufferInfoNumVerts = {};
         computeBufferInfoNumVerts.buffer = numVertsBuffer;
         computeBufferInfoNumVerts.offset = 0;
-        computeBufferInfoNumVerts.range = static_cast<uint32_t>(sizeof(int));
+        computeBufferInfoNumVerts.range = static_cast<uint32_t>(sizeof(int));  
 
         vk::WriteDescriptorSet writeComputeInfoNumVerts = {};
         writeComputeInfoNumVerts.dstSet = computeDescriptorSet[0];
@@ -396,8 +426,22 @@ private:
         writeComputeInfoNumVerts.descriptorType = vk::DescriptorType::eStorageBuffer;
         writeComputeInfoNumVerts.pBufferInfo = &computeBufferInfoNumVerts;
 
-        std::array<vk::WriteDescriptorSet, 5> writeDescriptorSets = { writeComputeInfoVertices1, writeComputeInfoVertices2, 
-            writeComputeInfoCellVertexArray, writeComputeInfoCellVertexCount, writeComputeInfoNumVerts };
+        // Set descriptor set for the buffer representing the sphere vertices
+        vk::DescriptorBufferInfo computeBufferInfoSphereVerts = {};
+        computeBufferInfoSphereVerts.buffer = sphereVertsBuffer;
+        computeBufferInfoSphereVerts.offset = 0;
+        computeBufferInfoSphereVerts.range = static_cast <uint32_t>(sizeof(Vertex) * sphere_verts.size());
+
+        vk::WriteDescriptorSet writeComputeInfoSphereVerts = {};
+        writeComputeInfoSphereVerts.dstSet = computeDescriptorSet[0];
+        writeComputeInfoSphereVerts.dstBinding = 5;
+        writeComputeInfoSphereVerts.descriptorCount = 1;
+        writeComputeInfoSphereVerts.dstArrayElement = 0;
+        writeComputeInfoSphereVerts.descriptorType = vk::DescriptorType::eStorageBuffer;
+        writeComputeInfoSphereVerts.pBufferInfo = &computeBufferInfoSphereVerts;
+
+        std::array<vk::WriteDescriptorSet, 6> writeDescriptorSets = { writeComputeInfoVertices1, writeComputeInfoVertices2, 
+            writeComputeInfoCellVertexArray, writeComputeInfoCellVertexCount, writeComputeInfoNumVerts,  writeComputeInfoSphereVerts };
         device->updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
         std::array<vk::DescriptorSetLayout, 1> descriptorSetLayouts = { computeDescriptorSetLayout };
 
@@ -486,6 +530,7 @@ private:
         device->destroyPipeline(computePipelinePhysics);
         device->destroyPipeline(computePipelineFillCellVertex);
         device->destroyPipeline(computePipelineResetCellVertex);
+        device->destroyPipeline(computePipelineSphereVertex);
         device->destroyPipelineLayout(computePipelineLayout);
         device->destroyDescriptorPool(computeDescriptorPool);
         device->destroyDescriptorSetLayout(computeDescriptorSetLayout);
@@ -511,6 +556,8 @@ private:
         device->freeMemory(cellVertArrayBufferMemory);
         device->destroyBuffer(cellVertCountBuffer);
         device->freeMemory(cellVertCountBufferMemory);
+        device->destroyBuffer(sphereVertsBuffer);
+        device->freeMemory(sphereVertsBufferMemory);
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device->destroySemaphore(renderFinishedSemaphores[i]);
@@ -883,7 +930,7 @@ private:
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly = {};
-        inputAssembly.topology = vk::PrimitiveTopology::ePointList;
+        inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;  
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
         vk::Viewport viewport = {};
@@ -895,7 +942,7 @@ private:
         viewport.maxDepth = 1.0f;
 
         vk::Rect2D scissor = {};
-        scissor.offset = VULKAN_HPP_NAMESPACE::Offset2D{ 0, 0 };
+        scissor.offset = vk::Offset2D{ 0, 0 };
         scissor.extent = swapChainExtent;
 
         vk::PipelineViewportStateCreateInfo viewportState = {};
@@ -1194,72 +1241,39 @@ private:
 
     void loadModel()
     {
-        //tinyobj::attrib_t attrib;
-        //std::vector<tinyobj::shape_t> shapes;
-        //std::vector<tinyobj::material_t> materials;
-        //std::string warn, err;
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
 
-        //if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-        //    std::cerr << warn + err << std::endl;
-        //    return;
-        //}
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, BALL_PATH.c_str())) {
+            std::cerr << warn + err << std::endl;
+            return;
+        }
 
-        //tinyobj::attrib_t ball_attrib;
-        //std::vector<tinyobj::shape_t> ball_shapes;
-        //std::vector<tinyobj::material_t> ball_materials;
-        //if (!tinyobj::LoadObj(&ball_attrib, &ball_shapes, &ball_materials, &warn, &err, BALL_PATH.c_str())) {
-        //    std::cerr << warn + err << std::endl;
-        //    return;
-        //}
+        const float scale = 0.1f;
 
-        //// std::unordered_map<Vertex, uint32_t> uniqueVertices;
-        //for (const auto& shape : shapes) {
-        //    for (const auto& index : shape.mesh.indices) {
-        //        Vertex vertex{};
+        // std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        for (const auto& shape : shapes) {
+            for (const auto& index : shape.mesh.indices) {
+                Vertex vertex{};
 
-        //        vertex.pos = {
-        //            attrib.vertices[3 * index.vertex_index + 0],
-        //            attrib.vertices[3 * index.vertex_index + 1],
-        //            attrib.vertices[3 * index.vertex_index + 2]
-        //        };
-        //        
-        //        vertex.texCoord = { 0.0f, 0.0f };
-        //        vertex.color = { 1.0f, 1.0f, 1.0f };
+                glm::vec3 pos = {
+                    attrib.vertices[3 * index.vertex_index + 0],
+                    attrib.vertices[3 * index.vertex_index + 1],
+                    attrib.vertices[3 * index.vertex_index + 2]
+                };
 
-        //        vertices.push_back(vertex);
-        //        indices.push_back(indices.size());
+                vertex.position = glm::vec4(pos, 1.f) * scale;
+                vertex.position.w = 1.f;
+                vertex.color = glm::vec4(glm::normalize(pos), 1.f);
 
-        //        /*if (uniqueVertices.count(vertex) == 0) {
-        //            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-        //            vertices.push_back(vertex);
-        //        }
-        //        indices.push_back(uniqueVertices[vertex]);*/
-        //        
-        //        /*for (const auto& ball_shape : ball_shapes) {
-        //            for (const auto& ball_index : ball_shape.mesh.indices) {
-        //                Vertex vertex{};
+                model_verts.push_back(vertex);
+                model_indices.push_back(model_indices.size());
+            }
+        }
 
-        //                vertex.pos = {
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 0],
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 1],
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 2]
-        //                };
-
-        //                vertex.pos = glm::vec3(BALL_TRANS_MAT * BALL_SCALE_MAT * glm::vec4(vertex.pos, 1.f));
-        //                vertex.texCoord = { 0.0f, 0.0f};
-        //                vertex.color = { 1.0f, 1.0f, 1.0f };
-
-        //                if (uniqueVertices.count(vertex) == 0) {
-        //                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-        //                    vertices.push_back(vertex);
-        //                }
-        //                indices.push_back(uniqueVertices[vertex]);
-        //            }
-        //        }*/
-        //    }
-        //}
-
-        //std::cout << vertices.size() << std::endl;
+        std::cout << "Model vertices number: " << model_verts.size() << std::endl;
     }
 
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,
@@ -1389,7 +1403,7 @@ private:
     }
 
     void createIndexBuffer() {
-        vk::DeviceSize bufferSize = static_cast<uint32_t>(raw_indices.size() * sizeof(raw_indices[0]));
+        vk::DeviceSize bufferSize = static_cast<uint32_t>(sphere_indices.size() * sizeof(sphere_indices[0]));
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
 
         vk::Buffer stagingBuffer;
@@ -1397,7 +1411,7 @@ private:
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
 
         void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
-        memcpy(data, raw_indices.data(), (size_t)bufferSize);
+        memcpy(data, sphere_indices.data(), (size_t)bufferSize);
         device->unmapMemory(stagingBufferMemory);
 
         createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
@@ -1433,7 +1447,7 @@ private:
     }
 
     void createCellVertArrayBuffer() {
-        vk::DeviceSize bufferSize = sizeof(int) * N_GRID_CELLS * 6;
+        vk::DeviceSize bufferSize = static_cast < uint32_t>(sizeof(int) * N_GRID_CELLS * 6);
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
 
         vk::Buffer stagingBuffer;
@@ -1453,8 +1467,51 @@ private:
         device->freeMemory(stagingBufferMemory);
     }
 
+ /*   void createSphereVertsBuffer() {
+        vk::DeviceSize bufferSize = static_cast <uint32_t>(sizeof(Vertex) * sphere_verts.size());
+        // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, sphere_verts.data(), (size_t)bufferSize);
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst
+            | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
+            vk::MemoryPropertyFlagBits::eDeviceLocal | vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+            , sphereVertsBuffer, sphereVertsBufferMemory);
+
+        copyBuffer(stagingBuffer, sphereVertsBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }*/
+
+    void createSphereVertsBuffer() {
+        vk::DeviceSize bufferSize = static_cast < uint32_t>(sizeof(Vertex) * sphere_verts.size());
+
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+        void* data = device->mapMemory(stagingBufferMemory, 0, bufferSize);
+        memcpy(data, sphere_verts.data(), (size_t)bufferSize);  
+        device->unmapMemory(stagingBufferMemory);
+
+        createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer |
+            vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, sphereVertsBuffer, sphereVertsBufferMemory);
+
+        copyBuffer(stagingBuffer, sphereVertsBuffer, bufferSize);
+
+        device->destroyBuffer(stagingBuffer);
+        device->freeMemory(stagingBufferMemory);
+    }
+
     void createCellVertCountBuffer() {
-        vk::DeviceSize bufferSize = sizeof(int) * N_GRID_CELLS;
+        vk::DeviceSize bufferSize = static_cast < uint32_t>(sizeof(int) * N_GRID_CELLS);
         // vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();;
 
         vk::Buffer stagingBuffer;
@@ -1475,7 +1532,7 @@ private:
     }
 
     void createuniformUboBuffers() {
-        vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+        vk::DeviceSize bufferSize = static_cast < uint32_t>(sizeof(UniformBufferObject));
 
         uniformUboBuffers.resize(swapChainImages.size());
         uniformUboBuffersMemory.resize(swapChainImages.size());
@@ -1748,6 +1805,36 @@ private:
 
             // Dispatch the compute kernel, with one thread for each vertex
             commandBuffers[i].dispatch(uint32_t(raw_verts.size()), 1, 1);
+
+            vk::BufferMemoryBarrier computeToComputeBarrier2 = {};
+            computeToComputeBarrier2.srcAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+            computeToComputeBarrier2.dstAccessMask = vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+            computeToComputeBarrier2.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier2.dstQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
+            computeToComputeBarrier2.buffer = vertexBuffer2;
+            computeToComputeBarrier2.offset = 0;
+            computeToComputeBarrier2.size = uint32_t(raw_verts.size()) * sizeof(Vertex);  //vertexBufferSize
+
+
+            vk::PipelineStageFlags computeShaderStageFlags_5(vk::PipelineStageFlagBits::eComputeShader);
+            vk::PipelineStageFlags computeShaderStageFlags_6(vk::PipelineStageFlagBits::eComputeShader);
+            commandBuffers[i].pipelineBarrier(computeShaderStageFlags_5,
+                computeShaderStageFlags_6,
+                vk::DependencyFlags(),
+                0, nullptr,
+                1, &computeToComputeBarrier2,
+                0, nullptr);
+
+            // Bind the compute pipeline
+            //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelinePhysics);
+            commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eCompute, computePipelineSphereVertex);
+
+            // Bind descriptor sets for compute
+            //vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &ComputeDescriptorSet, 0, nullptr);
+            commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, computeDescriptorSet.data(), 0, nullptr);
+
+            // Dispatch the compute kernel, with one thread for each vertex
+            commandBuffers[i].dispatch(uint32_t(sphere_verts.size()), 1, 1);
             
             // Define a memory barrier to transition the vertex buffer from a compute storage object to a vertex input
             vk::BufferMemoryBarrier computeToVertexBarrier = {};
@@ -1755,9 +1842,9 @@ private:
             computeToVertexBarrier.dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead;
             computeToVertexBarrier.srcQueueFamilyIndex = queueFamilyIndices.computeFamily.value();
             computeToVertexBarrier.dstQueueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-            computeToVertexBarrier.buffer = vertexBuffer2;
+            computeToVertexBarrier.buffer = sphereVertsBuffer;
             computeToVertexBarrier.offset = 0;
-            computeToVertexBarrier.size = uint32_t(raw_verts.size()) * sizeof(Vertex);  //vertexBufferSize
+            computeToVertexBarrier.size = uint32_t(sphere_verts.size()) * sizeof(Vertex);  //vertexBufferSize
 
 
             vk::PipelineStageFlags computeShaderStageFlags(vk::PipelineStageFlagBits::eComputeShader);
@@ -1772,13 +1859,13 @@ private:
             commandBuffers[i].beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
             commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
-            vk::Buffer vertexBuffers[] = { vertexBuffer1 };
+            vk::Buffer vertexBuffers[] = { sphereVertsBuffer };
             vk::DeviceSize offsets[] = { 0 };
             commandBuffers[i].bindVertexBuffers(0, 1, vertexBuffers, offsets);
             commandBuffers[i].bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint32);
 
             commandBuffers[i].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-            commandBuffers[i].drawIndexed(static_cast<uint32_t>(uint32_t(raw_indices.size())), 1, 0, 0, 0);
+            commandBuffers[i].drawIndexed(static_cast<uint32_t>(uint32_t(sphere_indices.size())), 1, 0, 0, 0);
 
             commandBuffers[i].endRenderPass();
 

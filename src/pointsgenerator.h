@@ -4,7 +4,7 @@
 
 namespace PointsGenerator {
     void createCube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
-                    const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR) 
+                    const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
     {
         float l = (float)N_SIDE / 10.f;
 
@@ -36,7 +36,8 @@ namespace PointsGenerator {
 
     // 14112 points when N_SIDE = 30
     void createSphere(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
-                      const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR, const glm::vec3& InitialVel)
+                      const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR, 
+                      const glm::vec3& InitialVel = glm::vec3(0.f))
     {
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;

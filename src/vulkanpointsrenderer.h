@@ -29,7 +29,6 @@ private:
     GLFWwindow* window;
 
     vk::UniqueInstance instance;
-    // VkDebugUtilsMessengerEXT callback;
     vk::SurfaceKHR surface;
 
     vk::PhysicalDevice physicalDevice;
@@ -210,7 +209,6 @@ private:
         createTextureImageView();
         createTextureSampler();
 
-        // loadModel();
         createVertexBuffers();
         createIndexBuffer();
         createNumVertsBuffer();
@@ -1190,76 +1188,6 @@ private:
         catch (vk::SystemError err) {
             throw std::runtime_error("failed to create texture sampler!");
         }
-    }
-
-    void loadModel()
-    {
-        //tinyobj::attrib_t attrib;
-        //std::vector<tinyobj::shape_t> shapes;
-        //std::vector<tinyobj::material_t> materials;
-        //std::string warn, err;
-
-        //if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-        //    std::cerr << warn + err << std::endl;
-        //    return;
-        //}
-
-        //tinyobj::attrib_t ball_attrib;
-        //std::vector<tinyobj::shape_t> ball_shapes;
-        //std::vector<tinyobj::material_t> ball_materials;
-        //if (!tinyobj::LoadObj(&ball_attrib, &ball_shapes, &ball_materials, &warn, &err, BALL_PATH.c_str())) {
-        //    std::cerr << warn + err << std::endl;
-        //    return;
-        //}
-
-        //// std::unordered_map<Vertex, uint32_t> uniqueVertices;
-        //for (const auto& shape : shapes) {
-        //    for (const auto& index : shape.mesh.indices) {
-        //        Vertex vertex{};
-
-        //        vertex.pos = {
-        //            attrib.vertices[3 * index.vertex_index + 0],
-        //            attrib.vertices[3 * index.vertex_index + 1],
-        //            attrib.vertices[3 * index.vertex_index + 2]
-        //        };
-        //        
-        //        vertex.texCoord = { 0.0f, 0.0f };
-        //        vertex.color = { 1.0f, 1.0f, 1.0f };
-
-        //        vertices.push_back(vertex);
-        //        indices.push_back(indices.size());
-
-        //        /*if (uniqueVertices.count(vertex) == 0) {
-        //            uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-        //            vertices.push_back(vertex);
-        //        }
-        //        indices.push_back(uniqueVertices[vertex]);*/
-        //        
-        //        /*for (const auto& ball_shape : ball_shapes) {
-        //            for (const auto& ball_index : ball_shape.mesh.indices) {
-        //                Vertex vertex{};
-
-        //                vertex.pos = {
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 0],
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 1],
-        //                    ball_attrib.vertices[3 * ball_index.vertex_index + 2]
-        //                };
-
-        //                vertex.pos = glm::vec3(BALL_TRANS_MAT * BALL_SCALE_MAT * glm::vec4(vertex.pos, 1.f));
-        //                vertex.texCoord = { 0.0f, 0.0f};
-        //                vertex.color = { 1.0f, 1.0f, 1.0f };
-
-        //                if (uniqueVertices.count(vertex) == 0) {
-        //                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-        //                    vertices.push_back(vertex);
-        //                }
-        //                indices.push_back(uniqueVertices[vertex]);
-        //            }
-        //        }*/
-        //    }
-        //}
-
-        //std::cout << vertices.size() << std::endl;
     }
 
     void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage,

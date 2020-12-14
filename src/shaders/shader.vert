@@ -24,8 +24,9 @@ out gl_PerVertex
 
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * inPosition;
-    gl_PointSize = 8.0;
+    gl_PointSize = 2.0;
     //fragColor = normalize(inVelocity.xyz);
-    fragColor = inColor.xyz;
+    float grayColor = inColor.x * 0.299 + inColor.y * 0.587 + inColor.z + 0.114;
+    fragColor = vec3(grayColor, grayColor, grayColor);
     //fragTexCoord = inTexCoord;
 }

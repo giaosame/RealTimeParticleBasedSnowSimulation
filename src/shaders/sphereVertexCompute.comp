@@ -1,0 +1,43 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+#define PI 3.1415926f
+#define SPHERE_POINTS 180
+
+struct Vertex {
+    vec4 position;
+	vec4 velocity;
+	vec4 attr1;  // radius, mass, isFixed, snowPortion
+	vec4 attr2;  // neighborMax, hasBrokenBond, d, (null)
+	vec4 color;
+};
+
+layout(set = 0, binding = 0) buffer VerticesA {
+	Vertex verticesA[];
+};
+
+layout(set = 0, binding = 1) buffer VerticesB {
+	Vertex verticesB[];
+};
+
+layout(set = 0, binding = 4) buffer UniformNumVerts {
+	int num_vertices;   
+};
+
+layout(set = 0, binding = 5) buffer SphereVerts {
+	Vertex sphereVerts[];   
+};
+
+// Compute cohesive forces, compressive forces, update radius, move particles
+void main() {
+	const int PARTICLE_COUNT = num_vertices * SPHERE_POINTS;
+	uint index = gl_GlobalInvocationID.x;
+	// Don't try to write beyond particle count
+    if (index >= PARTICLE_COUNT)
+		return;
+	
+	int vertexId = int(index) / SPHERE_POINTS;
+	vec3 deltaPos = verticesB[vertexId].position.xyz - verticesA[vertexId].position.xyz;
+	sphereVerts[index].position.xyz += deltaPos;
+	//sphereVerts[0].position.xyz = verticesB[0].position.xyz;
+}

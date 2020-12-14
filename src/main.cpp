@@ -1,7 +1,7 @@
 ﻿#include "vulkanpointsrenderer.h"
 #include "vulkanspheresrenderer.h"
 
-#define RENDER_USING_POINTS true
+#define RENDER_USING_POINTS false
 
 int main() {
 #if RENDER_USING_POINTS
