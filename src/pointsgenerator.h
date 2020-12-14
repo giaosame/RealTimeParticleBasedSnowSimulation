@@ -36,7 +36,7 @@ namespace PointsGenerator {
 
     // 14112 points when N_SIDE = 30
     void createSphere(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
-                      const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
+                      const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR, const glm::vec3& InitialVel)
     {
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;
@@ -66,6 +66,7 @@ namespace PointsGenerator {
                     Vertex v;
                     v.position = glm::vec4(position, 1.f);
                     v.color = glm::vec4(COLOR, 1.f);
+                    v.velocity = glm::vec4(InitialVel, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
                     idx++;

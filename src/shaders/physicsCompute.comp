@@ -61,13 +61,13 @@ void main() {
 	const float FminW = 0.12275f;
 	const float FmaxW = 10000.f;
 
-	const float damping = 0.9f;
+	const float damping = 0.98f;
 	const float boundry_damping = 0.5f;
 
 	const vec3 gravity = vec3(0.f, -9.82f, 0.f);
 
 	const float Kf = 50.f;
-	const float angle_of_repose = 48.f / 180.f * PI;
+	const float angle_of_repose = 38.f / 180.f * PI;
 	const float dt = 0.0017f;
 
 

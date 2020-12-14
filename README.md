@@ -16,6 +16,13 @@ Real-time Particle-based Snow Simulation with Vulkan (still working on it)
 
 The goal of this project is to achieve a real-time particle-based snow simulator. The simulation is expected to be accelerated by using GPU for attributes computation. Vulkan is used to visualize the snow particles in the simulation process.
 
+Our project has following goals:
+
+- Achieve a real-time, particle-based method to simulate snow dynamics on the GPU.
+- Use Vulkan compute shader to accelerate the simulation and visualize snow particles in real time with Vulkan as well.
+- Compare the performance of using CPU, CUDA and Vulkan compute shader for attributes computation.
+
+
 ![](presentations/imgs/softSnow.gif)
 
 **Implementation overview**
