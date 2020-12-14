@@ -12,6 +12,8 @@ Real-time Particle-based Snow Simulation with Vulkan (still working on it)
 <!-- Tested on: Windows 10, i5-9600K @ 3.70GHz 16GB, RTX 2070 SUPER 8GB   -->
 ----
 
+![](presentations/imgs/softSnow1.gif)
+
 **Brief description**
 
 The goal of this project is to achieve a real-time particle-based snow simulator. The simulation is expected to be accelerated by using GPU for attributes computation. Vulkan is used to visualize the snow particles in the simulation process.
@@ -22,8 +24,13 @@ Our project has following goals:
 - Use Vulkan compute shader to accelerate the simulation and visualize snow particles in real time with Vulkan as well.
 - Compare the performance of using CPU, CUDA and Vulkan compute shader for attributes computation.
 
+**Motivation:**
 
-![](presentations/imgs/softSnow.gif)
+Based on our interest in simulation, we chose this topic, and this is also a good opportunity for us to explore a new graphics API, Vulkan. 
+
+We have done some physical simulation projects before, such as water and colloidal objects, but if you use the CPU for calculation, it often takes a long time to simulate a few seconds of movement, and only offline rendering can be achieved. Using CUDA can speed up and achieve real-time effects, but if visualization is performed at the same time, such as using OpenGL or Vulkan, because it involves frequent data copying, reading and writing, it will also greatly affect efficiency. So we consider using Vulkan's compute pipeline to accelerate the calculation, and use Vulkan for visualization, hoping to improve performance.
+
+
 
 **Implementation overview**
 
@@ -34,9 +41,24 @@ The simulation is duvided into steps seen in the following algorithm:
 		NeighborSearch();
 		CohesionAndRepulsion();
 		HandleCollision();
-		Thermodynamics();
 		Compression();
 	end
+
+**Building the Project**
+
+- Clone the repo 
+
+- Open the CMake GUI to configure the project
+
+- Make the "Source" directory points to the directory cuda-getting-started.
+Click Configure.
+
+- Select your Visual Studio version, and x64 for your platform. 
+Click Generate.
+
+- If generation was successful, there should now be a Visual Studio solution (.sln) file in the build directory that you just created. Open this with Visual Studio.
+
+- Build. 
 
 **Third parties**
 
