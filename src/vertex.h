@@ -12,6 +12,7 @@ struct Vertex {
     glm::vec4 velocity = glm::vec4(0.f, 0.f, 0.f, 1.f);
     glm::vec4 attr1 = glm::vec4(0.05f, 0.0125f, -1.f, 1.f);;  // radius, mass, isFixed, snowPortion
     glm::vec4 attr2 = glm::vec4(-1.f, -1.f, 1.f, 1.f);;  // neighborMax, hasBrokenBond, d, (null)
+    glm::vec4 color = glm::vec4(1.f, 1.f, 1.f, 1.f);
 
     static vk::VertexInputBindingDescription getBindingDescription() {
         vk::VertexInputBindingDescription bindingDescription{};
@@ -21,8 +22,8 @@ struct Vertex {
         return bindingDescription;
     }
 
-    static std::array<vk::VertexInputAttributeDescription, 4> getAttributeDescriptions() {
-        std::array<vk::VertexInputAttributeDescription, 4> attributeDescriptions{};
+    static std::array<vk::VertexInputAttributeDescription, 5> getAttributeDescriptions() {
+        std::array<vk::VertexInputAttributeDescription, 5> attributeDescriptions{};
 
         attributeDescriptions[0].binding = 0;
         attributeDescriptions[0].location = 0;
@@ -44,11 +45,20 @@ struct Vertex {
         attributeDescriptions[3].format = vk::Format::eR32G32B32Sfloat;
         attributeDescriptions[3].offset = offsetof(Vertex, attr2);
 
+        attributeDescriptions[4].binding = 0;
+        attributeDescriptions[4].location = 4;
+        attributeDescriptions[4].format = vk::Format::eR32G32B32Sfloat;
+        attributeDescriptions[4].offset = offsetof(Vertex, color);
+
         return attributeDescriptions;
     }
 
     bool operator==(const Vertex& other) const {
-        return position == other.position && velocity == other.velocity && attr1 == other.attr1 && attr2 == other.attr2;
+        return position == other.position && 
+            velocity == other.velocity && 
+            attr1 == other.attr1 && 
+            attr2 == other.attr2 &&
+            color == other.color;
     }
 };
 

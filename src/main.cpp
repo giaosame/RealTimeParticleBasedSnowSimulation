@@ -290,12 +290,15 @@ private:
     void initParticles() {
         // cube 
         // float l = 0.98f * (float)n / 10.f;
+        int idxForWholeVertices = 0;
         const glm::vec3 OFFSET(0.05f, 0.05f, 0.05f);
-        PointsGenerator::createCube(raw_verts, raw_indices, 60, OFFSET);
+        PointsGenerator::createCube(raw_verts, raw_indices, idxForWholeVertices, 15, OFFSET, glm::vec3(1.f, 1.f, 0.f));
+        std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
         
-        // PointsGenerator::createSphere(raw_verts, raw_indices, N_SIDE, glm::vec3(0.05f, 1.05f, 0.05f));
-        // PointsGenerator::createTorus(raw_verts, raw_indices, N_SIDE, OFFSET);
-        // std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
+        // PointsGenerator::createSphere(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.15f, 0.05f), glm::vec3(1.f, 1.f, 1.f));
+        // PointsGenerator::createTorus(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
+        // PointsGenerator::createHeart(raw_verts, raw_indices, idxForWholeVertices, N_SIDE, glm::vec3(0.05f, 1.f, 0.05f), glm::vec3(1.f, 0.f, 0.f));
+        std::cout << "Number of vertices: " << raw_verts.size() << std::endl;
     }
 
     void initVulkan() {

@@ -9,6 +9,7 @@ struct Vertex {
 	vec4 velocity;
 	vec4 attr1;  // radius, mass, isFixed, snowPortion
 	vec4 attr2;  // neighborMax, hasBrokenBond, d, (null)
+	vec4 color;
 };
 
 layout(set = 0, binding = 0) buffer VerticesA {

@@ -3,10 +3,12 @@
 #include "vertex.h"
 
 namespace PointsGenerator {
-    void createCube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET) {
+    void createCube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
+                    const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR) 
+    {
         float l = (float)N_SIDE / 10.f;
 
-        int idx = 0;
+        int idx = idxForWholeVertices;
         for (int i = 0; i < N_SIDE; ++i)
         {
             for (int j = 0; j < N_SIDE; ++j)
@@ -21,20 +23,25 @@ namespace PointsGenerator {
 
                     Vertex v;
                     v.position = glm::vec4(position, 1.f);
+                    v.color = glm::vec4(COLOR, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
                     idx++;
                 }
             }
         }
+
+        idxForWholeVertices = idx;
     }
 
     // 14112 points when N_SIDE = 30
-    void createSphere(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET) {
+    void createSphere(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
+                      const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
+    {
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;
 
-        int idx = 0;
+        int idx = idxForWholeVertices;
         for (int i = 0; i < N_SIDE; ++i)  // z
         {
             for (int j = 0; j < N_SIDE; ++j)  // y
@@ -58,12 +65,15 @@ namespace PointsGenerator {
 
                     Vertex v;
                     v.position = glm::vec4(position, 1.f);
+                    v.color = glm::vec4(COLOR, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
                     idx++;
                 }
             }
         }
+
+        idxForWholeVertices = idx;
     }
 
     bool inTanglecube(const glm::vec3& p) {
@@ -73,17 +83,15 @@ namespace PointsGenerator {
         return x2* x2 - 5.f * x2 + y2 * y2 - 5.f * y2 + z2 * z2 - 5.f * z2 + 11.8f <= 0;
     }
 
-    void createTanglecube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    void createTanglecube(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
+                          const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
     {
-        // x^4 - 5x^2 + y^4 - 5y^2 + z^4 - 5z^2 + 11.8 = 0.
-        
-
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;
         const float MID_L = MID * l / float(N_SIDE);
         const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
 
-        int idx = 0;
+        int idx = idxForWholeVertices;
         for (int i = 0; i < N_SIDE; ++i)  // z
         {
             float z = i * l / float(N_SIDE);
@@ -100,12 +108,15 @@ namespace PointsGenerator {
 
                     Vertex v;
                     v.position = glm::vec4(position + OFFSET, 1.f);
+                    v.color = glm::vec4(COLOR, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
                     idx++;
                 }
             }
         }
+
+        idxForWholeVertices = idx;
     }
 
     bool inHeart(const glm::vec3& p) {
@@ -118,14 +129,15 @@ namespace PointsGenerator {
         return temp * temp * temp - x2 * z3 - 9.f * y2 * z3 / 80.f <= 0;
     }
 
-    void createHeart(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    void createHeart(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
+                     const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
     {
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;
         const float MID_L = MID * l / float(N_SIDE);
         const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
 
-        int idx = 0;
+        int idx = idxForWholeVertices;
         for (int i = 0; i < N_SIDE; ++i)  // z
         {
             float z = i * l / float(N_SIDE);
@@ -143,12 +155,15 @@ namespace PointsGenerator {
                     Vertex v;
                     position = glm::vec3(position.y, position.z, position.x);
                     v.position = glm::vec4(position + OFFSET, 1.f);
+                    v.color = glm::vec4(COLOR, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
                     idx++;
                 }
             }
         }
+
+        idxForWholeVertices = idx;
     }
 
     bool inTorus(const glm::vec3& p) {
@@ -158,14 +173,15 @@ namespace PointsGenerator {
         return len - r2 <= 0;
     }
 
-    void createTorus(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, const int N_SIDE, const glm::vec3& OFFSET)
+    void createTorus(std::vector<Vertex>& verts, std::vector<uint32_t>& indices, int& idxForWholeVertices,
+                     const int N_SIDE, const glm::vec3& OFFSET, const glm::vec3& COLOR)
     {
         float l = float(N_SIDE) / 10.f;
         const float MID = float(N_SIDE) / 2;
         const float MID_L = MID * l / float(N_SIDE);
         const glm::vec3 center = glm::vec3(MID_L, MID_L, MID_L);
 
-        int idx = 0;
+        int idx = idxForWholeVertices;
         for (int i = 0; i < N_SIDE; ++i)  // z
         {
             float z = i * l / float(N_SIDE);
@@ -182,6 +198,7 @@ namespace PointsGenerator {
 
                     Vertex v;
                     position = glm::vec3(position.y, position.z, position.x);
+                    v.color = glm::vec4(COLOR, 1.f);
                     v.position = glm::vec4(position + OFFSET, 1.f);
                     verts.push_back(v);
                     indices.push_back(idx);
@@ -189,7 +206,6 @@ namespace PointsGenerator {
                 }
             }
         }
+        idxForWholeVertices = idx;
     }
-
-
 }
